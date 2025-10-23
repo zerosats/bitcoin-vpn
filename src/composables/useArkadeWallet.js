@@ -231,9 +231,23 @@ export function useArkadeWallet() {
           return 0n
         }
         
-        // Use the SDK's total field which properly handles overlaps
-        // (e.g., preconfirmed VTXOs that are also in available)
-        if (balanceData.total !== undefined) {
+        // Don't use SDK's total - it double-counts boarding + settled
+        // After onboarding, boarding.confirmed moves to settled/available
+        // So we should NOT sum them both
+        
+        // Check if we have both boarding AND settled/available (indicates double-counting)
+        const hasBoardingConfirmed = balanceData.boarding?.confirmed > 0 || balanceData.boarding?.total > 0
+        const hasSettledOrAvailable = (balanceData.settled > 0 || balanceData.available > 0)
+        
+        if (hasBoardingConfirmed && hasSettledOrAvailable) {
+          // Double-counting scenario detected!
+          // Use only settled/available + recoverable (ignore boarding as it's already counted)
+          console.warn('⚠️ Detected potential double-counting (boarding + settled both > 0)')
+          totalBalance = 
+            toBigInt(balanceData.available || 0) +
+            toBigInt(balanceData.recoverable || 0)
+        } else if (balanceData.total !== undefined) {
+          // Safe to use SDK total if no double-counting detected
           totalBalance = toBigInt(balanceData.total)
         } else {
           // Fallback: use only available + recoverable (most reliable states)

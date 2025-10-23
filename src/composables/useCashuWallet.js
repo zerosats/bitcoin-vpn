@@ -590,62 +590,60 @@ export function useCashuWallet() {
       const totalAvailable = proofs.value.reduce((sum, p) => sum + p.amount, 0)
       console.log('Current balance:', totalAvailable, 'sats')
       
-      // ✅ NEW APPROACH: Just select proofs, don't swap them first!
-      // The meltTokens() function will handle change via blank outputs internally
-      console.log('Selecting proofs to cover payment...')
+      // ✅ NEW APPROACH: Swap proofs first to get exact amount, then melt
+      // meltTokens() doesn't create change - it burns whatever you give it!
+      console.log('Step 1: Swapping proofs to get exact amount needed:', amountNeeded, 'sats')
       
-      const proofsToMelt = []
-      let selectedTotal = 0
+      // Note: wallet.send() manages its own counter internally, don't pass it
+      const swapResult = await wallet.value.send(amountNeeded, proofs.value)
       
-      // Select proofs until we have enough to cover the payment
-      for (const proof of proofs.value) {
-        if (selectedTotal < amountNeeded) {
-          proofsToMelt.push(proof)
-          selectedTotal += proof.amount
-        } else {
-          break
-        }
+      const proofsToMelt = swapResult.send || swapResult.proofs || []
+      const keepProofs = swapResult.keep || swapResult.returnChange || []
+      
+      const meltTotal = proofsToMelt.reduce((s, p) => s + p.amount, 0)
+      const keepTotal = keepProofs.reduce((s, p) => s + p.amount, 0)
+      
+      console.log('Swap complete:')
+      console.log('  Proofs to melt:', proofsToMelt.length, '- Total:', meltTotal, 'sats')
+      console.log('  Keep (change):', keepProofs.length, '- Total:', keepTotal, 'sats')
+      
+      if (meltTotal !== amountNeeded) {
+        throw new Error(`Swap failed: got ${meltTotal} sats but needed ${amountNeeded} sats`)
       }
       
-      console.log('Selected', proofsToMelt.length, 'proofs, total:', selectedTotal, 'sats')
-      console.log('Expected change:', selectedTotal - amountNeeded, 'sats')
+      // Update wallet with change from swap
+      proofs.value = keepProofs
+      saveProofs()
       
-      if (selectedTotal < amountNeeded) {
-        throw new Error(`Could not select enough proofs. Selected ${selectedTotal} sats, need ${amountNeeded} sats`)
-      }
-      
-      // Melt the tokens - SDK should return change automatically
-      console.log('Melting tokens to pay Lightning invoice...')
+      // Step 2: Melt the exact amount
+      console.log('Step 2: Melting', meltTotal, 'sats to pay Lightning invoice...')
       const result = await wallet.value.meltTokens(meltQuote, proofsToMelt)
       console.log('✅ Melt result:', result)
       
-      // Update wallet: remove melted proofs, add change
+      // Handle any change from melt (fee refund)
       console.log('Updating wallet...')
       
-      // Remove the proofs we just melted
-      proofs.value = proofs.value.filter(p => !proofsToMelt.some(mp => mp.secret === p.secret))
-      console.log('Removed', proofsToMelt.length, 'melted proofs')
-      
-      // Add change proofs from melt result
-      // The change represents: (overpayment + fee refund)
+      // Add change proofs from melt result (this is the fee refund)
       if (result.change && result.change.length > 0) {
         const changeAmount = result.change.reduce((sum, p) => sum + p.amount, 0)
         proofs.value.push(...result.change)
-        console.log('✅ Added', result.change.length, 'change proofs (', changeAmount, 'sats )')
+        console.log('✅ Added', result.change.length, 'fee refund proofs (', changeAmount, 'sats )')
       } else {
-        console.log('⚠️ No change proofs returned from melt')
+        console.log('ℹ️ No fee refund from melt (expected if fee_reserve was 0)')
       }
       
       saveProofs()
       
       const newBalance = proofs.value.reduce((sum, p) => sum + p.amount, 0)
-      const actualFee = selectedTotal - newBalance - meltQuote.amount
+      const feeRefund = result.change ? result.change.reduce((sum, p) => sum + p.amount, 0) : 0
+      const actualFee = meltQuote.fee_reserve - feeRefund
       
       console.log('✅ Payment complete!')
-      console.log('- Paid:', meltQuote.amount, 'sats')
-      console.log('- Original proofs:', selectedTotal, 'sats')
-      console.log('- Change received:', result.change ? result.change.reduce((sum, p) => sum + p.amount, 0) : 0, 'sats')
-      console.log('- Actual fee:', actualFee, 'sats')
+      console.log('- Invoice amount:', meltQuote.amount, 'sats')
+      console.log('- Fee reserve:', meltQuote.fee_reserve, 'sats')
+      console.log('- Fee refund:', feeRefund, 'sats')
+      console.log('- Actual routing fee:', actualFee, 'sats')
+      console.log('- Total cost:', meltQuote.amount + actualFee, 'sats')
       console.log('- New balance:', newBalance, 'sats')
       console.log('=== PAY LIGHTNING COMPLETE ===')
       
