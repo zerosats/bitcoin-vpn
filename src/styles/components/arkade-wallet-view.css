@@ -1,0 +1,123 @@
+/* ArkadeWalletView Component Styles */
+
+.wallet-view {
+  max-width: 550px;
+  color: white;
+}
+
+.unprotected .balance-display {
+  margin-bottom: 0.5rem;
+}
+
+.unprotected-balance .balance-label {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: #00F2E1 !important;
+  opacity: 1 !important;
+  margin-bottom: 0.5rem;
+}
+
+.desktop-content {
+  max-width: 100%;
+}
+
+.encrypt-section-new {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-bottom: 2.625rem;
+}
+
+.encrypt-btn-new {
+  width: 100%;
+  padding: 1.375rem 2.5rem;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #00F2E1 0%, #FFD900 100%);
+  color: #161920;
+  font-size: 1.1875rem;
+  font-weight: 700;
+  letter-spacing: 1.9px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 1.5rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+}
+
+.encrypt-btn-new:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 217, 0, 0.4);
+}
+
+.encrypt-btn-new:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.warning-text-new {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: #586b79;
+  text-align: center;
+  opacity: 0.8;
+  margin-bottom: 2rem;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .desktop-content {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .wallet-view {
+    max-width: 100%;
+  }
+
+  .balance-amount-large {
+    font-size: 3.5rem;
+  }
+
+  .unit-btc {
+    font-size: 1rem;
+  }
+
+  .unprotected-balance .balance-label {
+    font-size: 1.2rem;
+  }
+
+  .swap-icon-background {
+    width: 6rem;
+    height: 6rem;
+  }
+
+  .swap-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .amount-input {
+    font-size: 1.1rem;
+    width: 80px;
+  }
+
+  .max-btn {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+  }
+
+  .desktop-content {
+    max-width: 100%;
+  }
+}
+
