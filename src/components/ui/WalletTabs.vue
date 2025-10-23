@@ -44,8 +44,8 @@ defineEmits(['update:activeTab', 'toggleMenu'])
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 2rem;
-  margin-bottom: 3rem;
+  margin-top: 0.5rem;
+  margin-bottom: 2rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }

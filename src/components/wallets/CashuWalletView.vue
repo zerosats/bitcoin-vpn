@@ -72,7 +72,7 @@ const dismissPrivacyMessage = () => {
 <style scoped>
 /* Wallet Views */
 .wallet-view {
-  max-width: 800px;
+  max-width: 550px;
   color: white;
 }
 

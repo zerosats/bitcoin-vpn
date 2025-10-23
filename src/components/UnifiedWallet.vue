@@ -1,53 +1,56 @@
 <template>
   <div class="unified-wallet" :class="{ 'encrypted-mode': activeTab === 'encrypted' }">
     <!-- Tab Toggle -->
-    <WalletTabs v-model:activeTab="activeTab" @toggleMenu="showMenu = !showMenu">
-      <template #menu>
-        <DropdownMenu :show="showMenu">
-          <!-- Cashu Advanced Options -->
-          <template v-if="activeTab === 'encrypted'">
-            <button @click="() => { handleVerifyBalance(); showMenu = false }" class="menu-item" :disabled="verifying">
-              {{ verifying ? '🔍 Verifying...' : '🔍 Verify Balance' }}
-            </button>
-            <button @click="() => { handleGetLastToken(); showMenu = false }" class="menu-item">
-              📋 Get Last Token
-            </button>
-            <button @click="() => { handleRestoreCashu(); showMenu = false }" class="menu-item" :disabled="restoring">
-              {{ restoring ? '🔄 Restoring...' : '🔄 Restore from Seed' }}
-            </button>
-            <button @click="() => { handleDecryptToArkade(); showMenu = false }" class="menu-item" :disabled="!cashuBalance || decrypting">
-              {{ decrypting ? '🔓 Decrypting...' : '🔓 Decrypt to Arkade' }}
-            </button>
-          </template>
-          <!-- Arkade Advanced Options -->
-          <template v-else-if="activeTab === 'arkade'">
-            <button @click="openModal('arkadeSend'); showMenu = false" class="menu-item">
-              📤 Send to Ark Address
-            </button>
-            <button @click="openModal('arkadeDeposit'); showMenu = false" class="menu-item">
-              💰 Deposit Funds
-            </button>
-            <button @click="openModal('arkadePrivateKey'); showMenu = false" class="menu-item">
-              🔑 Show Private Key
-            </button>
-            <button @click="handleResetArkadeWallet; showMenu = false" class="menu-item">
-              🔄 Reset Arkade Wallet
-            </button>
-            <button @click="handleLoadVTXOs" class="menu-item" :disabled="loading">
-              {{ loading ? 'Loading...' : 'View VTXOs' }}
-            </button>
-          </template>
-        </DropdownMenu>
-      </template>
-    </WalletTabs>
+    <div class="tabs-wrapper">
+      <WalletTabs v-model:activeTab="activeTab" @toggleMenu="showMenu = !showMenu">
+        <template #menu>
+          <DropdownMenu :show="showMenu">
+            <!-- Cashu Advanced Options -->
+            <template v-if="activeTab === 'encrypted'">
+              <button @click="() => { handleVerifyBalance(); showMenu = false }" class="menu-item" :disabled="verifying">
+                {{ verifying ? '🔍 Verifying...' : '🔍 Verify Balance' }}
+              </button>
+              <button @click="() => { handleGetLastToken(); showMenu = false }" class="menu-item">
+                📋 Get Last Token
+              </button>
+              <button @click="() => { handleRestoreCashu(); showMenu = false }" class="menu-item" :disabled="restoring">
+                {{ restoring ? '🔄 Restoring...' : '🔄 Restore from Seed' }}
+              </button>
+              <button @click="() => { handleDecryptToArkade(); showMenu = false }" class="menu-item" :disabled="!cashuBalance || decrypting">
+                {{ decrypting ? '🔓 Decrypting...' : '🔓 Decrypt to Arkade' }}
+              </button>
+            </template>
+            <!-- Arkade Advanced Options -->
+            <template v-else-if="activeTab === 'arkade'">
+              <button @click="openModal('arkadeSend'); showMenu = false" class="menu-item">
+                📤 Send to Ark Address
+              </button>
+              <button @click="openModal('arkadeDeposit'); showMenu = false" class="menu-item">
+                💰 Deposit Funds
+              </button>
+              <button @click="openModal('arkadePrivateKey'); showMenu = false" class="menu-item">
+                🔑 Show Private Key
+              </button>
+              <button @click="handleResetArkadeWallet; showMenu = false" class="menu-item">
+                🔄 Reset Arkade Wallet
+              </button>
+              <button @click="handleLoadVTXOs" class="menu-item" :disabled="loading">
+                {{ loading ? 'Loading...' : 'View VTXOs' }}
+              </button>
+            </template>
+          </DropdownMenu>
+        </template>
+      </WalletTabs>
+    </div>
 
     <!-- Encrypted View (Cashu) -->
-    <CashuWalletView 
-      v-if="activeTab === 'encrypted'"
-      :balance="cashuBalance"
-      @send="openModal('send')"
-      @receive="openModal('receive')"
-    />
+    <div v-if="activeTab === 'encrypted'" class="cashu-layout">
+      <CashuWalletView 
+        :balance="cashuBalance"
+        @send="openModal('send')"
+        @receive="openModal('receive')"
+      />
+    </div>
 
     <!-- Arkade View with Right Panel -->
     <div v-if="activeTab === 'arkade'" class="arkade-layout">
@@ -1215,10 +1218,25 @@ onUnmounted(() => {
 <style scoped>
 .unified-wallet {
   min-height: 100vh;
-  padding: 3rem 4rem;
+  padding: 1rem 4rem;
   transition: background 0.5s ease;
   border-radius: 0;
   background: #0B0D11;
+}
+
+/* Tabs Wrapper - Align with layout */
+.tabs-wrapper {
+  width: 100%;
+  max-width: calc(550px + 8rem + 550px);
+  margin: 0 auto;
+  margin-bottom: 2rem;
+}
+
+/* Cashu Layout - Align with tabs */
+.cashu-layout {
+  width: 550px;
+  margin: 0 auto;
+  margin-left: calc(50% - (550px + 8rem + 550px) / 2);
 }
 
 /* Wallet Views */
@@ -2463,9 +2481,11 @@ onUnmounted(() => {
 /* Arkade Layout with Right Panel */
 .arkade-layout {
   display: grid;
-  grid-template-columns: 800px 1fr;
-  gap: 3rem;
+  grid-template-columns: 550px 550px;
+  gap: 8rem;
   align-items: start;
+  margin: 0 auto;
+  max-width: fit-content;
 }
 
 /* Right Panel */
