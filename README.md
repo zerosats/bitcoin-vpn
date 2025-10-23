@@ -1,10 +1,20 @@
-# Spark-Ark-Cashu Wallet
+# Arkade Wallet Desktop
 
-A unified Bitcoin wallet supporting three different protocols: **Cashu** (ecash), **Spark** (Lightning L2 - currently disabled), and **Arkade** (Ark/VTXOs).
+A unified Bitcoin desktop wallet built with Tauri, supporting three different protocols: **Cashu** (ecash), **Spark** (Lightning L2 - currently disabled), and **Arkade** (Ark/VTXOs).
 
 ⚠️ **Note:** 
+- This is the **desktop version** built with Tauri for better security and native performance
 - Spark wallet is currently disabled due to interference with Arkade Lightning payments
 - Using CASHU + ARKADE with Lightning support (via Boltz swaps at api.ark.boltz.exchange)
+
+## Downloads
+
+Download the latest release for your platform:
+- **macOS**: `.dmg` installer
+- **Windows**: `.exe` installer
+- **Linux**: `.AppImage` or `.deb` package
+
+Visit the [Releases](https://github.com/zerosats/arkade-wallet-desktop/releases) page to download.
 
 ## Features
 
@@ -32,21 +42,64 @@ A unified Bitcoin wallet supporting three different protocols: **Cashu** (ecash)
 - VTXO management
 - Private key-based recovery
 
-## Installation
+## Desktop Development
+
+### Prerequisites
+
+1. **Node.js** (v18 or higher)
+2. **Rust** (latest stable)
+   ```bash
+   # Install Rust from https://rustup.rs/
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+3. **Platform-specific dependencies**:
+   - **macOS**: Xcode Command Line Tools
+   - **Linux**: 
+     ```bash
+     sudo apt update
+     sudo apt install libwebkit2gtk-4.0-dev \
+       build-essential \
+       curl \
+       wget \
+       file \
+       libssl-dev \
+       libgtk-3-dev \
+       libayatana-appindicator3-dev \
+       librsvg2-dev
+     ```
+   - **Windows**: Microsoft C++ Build Tools
+
+### Installation
 
 ```bash
 npm install
 ```
 
-## Development
+### Run Desktop App in Development
 
 ```bash
-npm run dev
+npm run tauri:dev
 ```
 
-## Build
+This will start the Vite dev server and launch the Tauri desktop app with hot-reload enabled.
+
+### Build Desktop App for Production
 
 ```bash
+npm run tauri:build
+```
+
+The built application will be in `src-tauri/target/release/bundle/`
+
+### Web Version (Alternative)
+
+You can still run the web version:
+
+```bash
+# Development
+npm run dev
+
+# Build
 npm run build
 ```
 
@@ -127,12 +180,21 @@ npm run build
 
 ## Storage
 
-All wallets use browser localStorage:
-- **Cashu**: `cashu_seed`, `cashu_proofs`
-- **Spark**: `spark_mnemonic`
-- **Arkade**: `arkade_private_key`
+### Desktop App
+The desktop version uses Tauri's secure file system storage:
+- **Location**: Platform-specific app data directory
+  - macOS: `~/Library/Application Support/com.zerosats.arkade-wallet/`
+  - Linux: `~/.config/arkade-wallet/`
+  - Windows: `%APPDATA%\com.zerosats.arkade-wallet\`
+- **Wallets**: 
+  - **Cashu**: `cashu_seed`, `cashu_proofs`
+  - **Spark**: `spark_mnemonic`
+  - **Arkade**: `arkade_private_key`
 
-⚠️ **Warning**: Clear browser data will delete your wallets. Always backup your recovery keys!
+### Web Version
+Uses browser localStorage (same keys as above).
+
+⚠️ **Warning**: Always backup your recovery keys! Desktop app data persists between launches, but uninstalling the app may clear data.
 
 ## Networks
 
@@ -148,16 +210,70 @@ All wallets use browser localStorage:
 4. Start with small amounts
 5. Arkade is currently on testnet
 
-## Differences from Original
+## Desktop Version Features
 
-This fork adds **Arkade (Ark protocol)** as a third wallet option:
-- Original supported Cashu + Spark
-- Now supports Cashu + Spark + Arkade
-- Unified interface with 3 tabs
-- Same UI pattern for Spark and Arkade
+This desktop version adds:
+- **Native Desktop App**: Built with Tauri for macOS, Windows, and Linux
+- **Better Security**: Isolated runtime environment with controlled permissions
+- **Persistent Storage**: Platform-native secure storage (not browser localStorage)
+- **Smaller Bundle**: ~10-20MB (vs typical Electron apps at 150MB+)
+- **Better Performance**: Native performance with Rust backend
+- **System Integration**: Native notifications, system tray support
+- **Auto-updates**: Built-in update mechanism (coming soon)
+
+## Differences from Original Web Version
+
+- **Platform**: Desktop app (Tauri) instead of web-only
+- **Protocols**: Adds **Arkade (Ark protocol)** as a third wallet option
+- **Architecture**: 
+  - Original supported Cashu + Spark
+  - Now supports Cashu + Spark + Arkade
+  - Unified interface with 3 tabs
+  - Desktop-native features
+
+## Publishing Releases
+
+The project includes GitHub Actions for automated multi-platform builds.
+
+### Creating a Release
+
+1. **Tag a new version**:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+2. **GitHub Actions will automatically**:
+   - Build for macOS, Windows, and Linux
+   - Create installers for each platform
+   - Create a draft release with all binaries
+   - Upload artifacts to GitHub Releases
+
+3. **Review and publish**:
+   - Go to GitHub Releases
+   - Edit the draft release
+   - Add release notes
+   - Publish the release
+
+### Manual Build
+
+To build locally for your platform:
+```bash
+npm run tauri:build
+```
+
+Binaries will be in `src-tauri/target/release/bundle/`
 
 ## Development Roadmap
 
+### Desktop Features
+- [ ] Auto-update mechanism
+- [ ] System tray with quick actions
+- [ ] Native notifications for transactions
+- [ ] Hardware wallet integration
+- [ ] Enhanced security with OS keychain
+
+### Wallet Features
 - [ ] Arkade to Cashu encryption flow
 - [ ] Cashu to Arkade decryption flow
 - [ ] Arkade mainnet support

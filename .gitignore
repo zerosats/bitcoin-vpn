@@ -32,3 +32,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+

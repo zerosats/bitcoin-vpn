@@ -1,11 +1,21 @@
 {
-  "name": "spark-ark-cashu-wallet",
+  "name": "arkade-wallet-desktop",
   "version": "1.0.0",
+  "description": "Arkade Wallet Desktop - Bitcoin wallet supporting Cashu, Spark, and Arkade protocols",
+  "author": "zerosats",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zerosats/arkade-wallet-desktop"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@arkade-os/boltz-swap": "^0.2.1",
@@ -16,6 +26,8 @@
     "vue": "^3.4.0"
   },
   "devDependencies": {
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/cli": "^2.9.1",
     "@vitejs/plugin-vue": "^5.0.0",
     "vite": "^5.0.0"
   }
