@@ -34,7 +34,7 @@
               🔄 Reset Arkade Wallet
             </button>
             <button @click="handleLoadVTXOs" class="menu-item" :disabled="loading">
-              {{ loading ? '📦 Loading...' : '📦 View VTXOs' }}
+              {{ loading ? 'Loading...' : 'View VTXOs' }}
             </button>
           </template>
         </DropdownMenu>
@@ -49,18 +49,141 @@
       @receive="openModal('receive')"
     />
 
-    <!-- Arkade View -->
-    <ArkadeWalletView 
-      v-if="activeTab === 'arkade'"
-      :balance="arkadeBalance"
-      v-model:encryptAmount="encryptAmountArkade"
-      :mintUrlShort="mintUrlShort"
-      :estimatedFee="estimatedFee"
-      :encryptionInProgress="encryptionInProgress"
-      :encryptionStep="encryptionStep"
-      :canEncrypt="canEncryptFromArkade"
-      @encryptOrDeposit="handleEncryptOrDepositArkade"
-    />
+    <!-- Arkade View with Right Panel -->
+    <div v-if="activeTab === 'arkade'" class="arkade-layout">
+      <ArkadeWalletView 
+        :balance="arkadeBalance"
+        v-model:encryptAmount="encryptAmountArkade"
+        :mintUrlShort="mintUrlShort"
+        :estimatedFee="estimatedFee"
+        :encryptionInProgress="encryptionInProgress"
+        :encryptionStep="encryptionStep"
+        :canEncrypt="canEncryptFromArkade"
+        @encryptOrDeposit="handleEncryptOrDepositArkade"
+      />
+      
+      <!-- Right Side Panel -->
+      <div class="right-panel">
+        <div class="panel-header">
+          <button 
+            @click="rightPanelView = 'vtxos'" 
+            :class="['panel-tab', { active: rightPanelView === 'vtxos' }]"
+          >
+            VTXOs
+          </button>
+          <button 
+            @click="rightPanelView = 'deposit'" 
+            :class="['panel-tab', { active: rightPanelView === 'deposit' }]"
+          >
+            Deposit Address
+          </button>
+        </div>
+
+        <!-- VTXOs View -->
+        <div v-if="rightPanelView === 'vtxos'" class="panel-content">
+          <div class="panel-section">
+            <h3 class="panel-title">Your vUTXOs</h3>
+            <p class="panel-description">Virtual UTXOs on Arkade</p>
+            
+            <!-- Boarding Balance Display -->
+            <div v-if="boardingBalance > 0" class="boarding-balance-card">
+              <div class="boarding-header">
+                <span class="boarding-icon">🚢</span>
+                <span class="boarding-label">Ready to Board</span>
+              </div>
+              <div class="boarding-amount">{{ boardingBalance }} <span class="boarding-unit">sats</span></div>
+              <p class="boarding-description">Confirmed Bitcoin waiting to be onboarded</p>
+            </div>
+            
+            <div class="vtxo-actions">
+              <button 
+                @click="handleLoadVTXOs" 
+                class="panel-action-btn secondary"
+                :disabled="loading"
+              >
+                {{ loading ? 'Loading...' : 'Load confirmed vUTXOs' }}
+              </button>
+              
+              <button 
+                @click="handleOnboardBitcoin" 
+                class="panel-action-btn primary"
+                :disabled="loading || boardingBalance === 0"
+              >
+                {{ loading ? 'Onboarding...' : 'Onboard to vUTXOs' }}
+              </button>
+            </div>
+
+            <div v-if="vtxos.length > 0" class="vtxos-list-panel">
+              <div 
+                v-for="(vtxo, index) in vtxos" 
+                :key="index" 
+                class="vtxo-item-panel"
+                :class="{ 'selected': selectedVtxo === vtxo }"
+                @click="selectVtxo(vtxo)"
+                title="Click to select for encryption"
+              >
+                <div class="vtxo-header-panel">
+                  <span class="vtxo-status-badge" :class="getVtxoStatusClass(vtxo)">
+                    {{ getVtxoStatusLabel(vtxo) }}
+                  </span>
+                  <span class="vtxo-amount-badge">{{ vtxo.value || vtxo.amount || 0 }} sats</span>
+                </div>
+                <div class="vtxo-detail-panel">
+                  <span class="vtxo-label">TXID:</span>
+                  <span class="vtxo-value small">{{ vtxo.txid?.substring(0, 20) }}...</span>
+                </div>
+                <div v-if="vtxo.vout !== undefined" class="vtxo-detail-panel">
+                  <span class="vtxo-label">Output:</span>
+                  <span class="vtxo-value">{{ vtxo.vout }}</span>
+                </div>
+                
+                <!-- Selection indicator -->
+                <div v-if="selectedVtxo === vtxo" class="vtxo-selected-indicator">
+                  ✓ Selected for encryption
+                </div>
+              </div>
+            </div>
+            <div v-else-if="!loading" class="empty-state">
+              <p>No spendable VTXOs found. Deposit Bitcoin and onboard to create VTXOs.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deposit Address View -->
+        <div v-if="rightPanelView === 'deposit'" class="panel-content">
+          <div class="panel-section">
+            <h3 class="panel-title">Bitcoin Deposit</h3>
+            <p class="panel-description">Boarding address to deposit Bitcoin</p>
+
+            <div v-if="loading" class="loading-state">
+              <p>⏳ Generating address...</p>
+            </div>
+            
+            <div v-else-if="arkadeDepositAddress" class="address-display-panel">
+              <div 
+                class="address-box-panel" 
+                @click="copyToClipboard(arkadeDepositAddress, 'Address copied!')"
+                title="Click to copy"
+              >
+                {{ arkadeDepositAddress }}
+              </div>
+              
+              <!-- QR Code -->
+              <div class="qr-code-panel">
+                <canvas :id="'deposit-address-qr'"></canvas>
+              </div>
+              
+              <button 
+                @click="copyToClipboard(arkadeDepositAddress, 'Address copied!')" 
+                class="copy-btn-panel"
+              >
+                Copy Address
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Send Modal (Cashu) -->
     <CashuSendModal 
@@ -136,7 +259,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useWalletBridge } from '../composables/useWalletBridge'
 import { useArkadeWallet } from '../composables/useArkadeWallet'
 import { useToast } from '../composables/useToast'
@@ -203,6 +326,7 @@ const arkadeBalance = computed(() => {
 
 // State
 const activeTab = ref('arkade')
+const rightPanelView = ref('vtxos') // 'vtxos' or 'deposit'
 const encryptAmountArkade = ref(null)
 const sendToken = ref('')
 const showMenu = ref(false)
@@ -210,6 +334,8 @@ const arkadeDepositAddress = ref('')
 const arkadeDepositAddressType = ref('')
 const arkadeInvoiceQRCode = ref('')
 const vtxos = ref([])
+const selectedVtxo = ref(null)
+const boardingBalance = ref(0)
 const sending = ref(false)
 const receiving = ref(false)
 const loading = ref(false)
@@ -562,6 +688,7 @@ const handleEncryptFromArkade = async () => {
     if (result.success) {
       showSuccess(`✅ Successfully encrypted ${result.amount} sats from Arkade to Cashu!`)
       encryptAmountArkade.value = null
+      selectedVtxo.value = null // Clear VTXO selection
       // Auto-switch to encrypted view to show the new balance
       setTimeout(() => {
         activeTab.value = 'encrypted'
@@ -594,12 +721,60 @@ const handleGetArkOffchainAddress = async () => {
     arkadeDepositAddress.value = address
     arkadeDepositAddressType.value = 'Bitcoin Boarding Address'
     showSuccess('✅ Bitcoin boarding address retrieved!')
+    
+    // Generate QR code after address is set
+    await nextTick()
+    // Small delay to ensure canvas is rendered
+    setTimeout(async () => {
+      if (address) {
+        const success = await generateQR(address, 'deposit-address-qr', {
+          errorCorrectionLevel: 'H',
+          margin: 1,
+          width: 200,
+          color: {
+            dark: '#000000',
+            light: '#ffffff'
+          }
+        })
+        if (!success) {
+          console.error('QR code generation failed')
+        }
+      }
+    }, 100)
   } catch (error) {
     showError(`❌ Failed to get boarding address: ${error.message}`)
   } finally {
     loading.value = false
   }
 }
+
+// Watch for rightPanelView changes to deposit and automatically load address
+watch(rightPanelView, async (newView) => {
+  if (newView === 'deposit') {
+    if (!arkadeDepositAddress.value) {
+      await handleGetArkOffchainAddress()
+    } else {
+      // If address already exists, just regenerate the QR code
+      await nextTick()
+      try {
+        await generateQR(arkadeDepositAddress.value, 'deposit-address-qr', {
+          errorCorrectionLevel: 'H',
+          margin: 1,
+          width: 200,
+          color: {
+            dark: '#000000',
+            light: '#ffffff'
+          }
+        })
+      } catch (error) {
+        console.error('Failed to generate QR code:', error)
+      }
+    }
+  } else if (newView === 'vtxos') {
+    // Auto-load VTXOs and boarding balance when switching to VTXOs tab
+    await handleLoadVTXOs()
+  }
+}, { immediate: true })
 
 const handleOnboardBitcoin = async () => {
   loading.value = true
@@ -723,15 +898,199 @@ const handleResetArkadeWallet = async () => {
 const handleLoadVTXOs = async () => {
   loading.value = true
   try {
-    const vtxoList = await arkade.getVTXOs()
-    vtxos.value = vtxoList
-    openModal('vtxos')
+    // Get balance to check boarding amount
+    const balanceData = await arkade.updateBalance()
+    console.log('Balance data:', balanceData)
+    
+    // Extract boarding confirmed balance
+    if (balanceData && balanceData.boarding) {
+      if (typeof balanceData.boarding === 'object') {
+        boardingBalance.value = Number(balanceData.boarding.confirmed || 0)
+      } else {
+        boardingBalance.value = Number(balanceData.boarding || 0)
+      }
+    } else {
+      boardingBalance.value = 0
+    }
+    
+    console.log('Boarding balance:', boardingBalance.value)
+    
+    const allVtxos = await arkade.getVTXOs()
+    console.log('All VTXOs from SDK:', allVtxos)
+    console.log('Available balance:', arkadeBalance.value)
+    
+    // Filter to only show: settled, pre-confirmed, or confirmed VTXOs
+    // AND only show unspent VTXOs (part of current balance)
+    const filteredVtxos = allVtxos.filter(vtxo => {
+      console.log('=== VTXO FILTER DEBUG ===')
+      console.log('Full VTXO object:', JSON.parse(JSON.stringify(vtxo)))
+      console.log('VTXO value:', vtxo.value)
+      console.log('VTXO isSpent:', vtxo.isSpent)
+      console.log('VTXO isUnrolled:', vtxo.isUnrolled)
+      console.log('VTXO spentBy:', vtxo.spentBy)
+      console.log('VTXO settledBy:', vtxo.settledBy)
+      console.log('VTXO isSpendable:', vtxo.isSpendable)
+      console.log('VTXO redeemedAt:', vtxo.redeemedAt)
+      console.log('VTXO virtualStatus:', vtxo.virtualStatus)
+      console.log('VTXO physicalStatus:', vtxo.physicalStatus)
+      console.log('VTXO isPending:', vtxo.isPending)
+      console.log('VTXO pendingOutbound:', vtxo.pendingOutbound)
+      
+      // First check: Only show unspent VTXOs (current balance)
+      // More strict: must NOT be spent, redeemed, or unrolled
+      const isUnspent = !vtxo.isSpent && !vtxo.spentBy && !vtxo.redeemedAt && !vtxo.isUnrolled
+      console.log('Is unspent:', isUnspent)
+      
+      if (!isUnspent) {
+        console.log('Filtered out: VTXO is spent/redeemed/unrolled')
+        console.log('========================')
+        return false
+      }
+      
+      // Check if explicitly marked as not spendable
+      if (vtxo.isSpendable === false) {
+        console.log('Filtered out: VTXO is not spendable')
+        console.log('========================')
+        return false
+      }
+      
+      // Check if VTXO is pending outbound (sent to someone else)
+      if (vtxo.isPending || vtxo.pendingOutbound) {
+        console.log('Filtered out: VTXO is pending outbound')
+        console.log('========================')
+        return false
+      }
+      
+      // Check physical status - filter out anything that's not "settled" on-chain
+      if (vtxo.physicalStatus && vtxo.physicalStatus.state) {
+        const physicalState = String(vtxo.physicalStatus.state).toLowerCase()
+        console.log('Physical status state:', physicalState)
+        
+        // Only allow VTXOs with settled physical status (on-chain confirmed)
+        if (physicalState !== 'settled') {
+          console.log('Filtered out: Physical status is not settled:', physicalState)
+          console.log('========================')
+          return false
+        }
+      }
+      
+      // The actual status is in virtualStatus.state, not status
+      let statusStr = ''
+      
+      // First check virtualStatus.state (this is the correct location)
+      if (vtxo.virtualStatus && vtxo.virtualStatus.state) {
+        statusStr = String(vtxo.virtualStatus.state).toLowerCase()
+        console.log('Found status in virtualStatus.state:', statusStr)
+      }
+      // Fallback to other locations
+      else if (typeof vtxo.status === 'string') {
+        statusStr = vtxo.status.toLowerCase()
+      } else if (typeof vtxo.status === 'number') {
+        // Status might be an enum - map numbers to strings
+        const statusMap = {
+          0: 'settled',
+          1: 'confirmed',
+          2: 'preconfirmed',
+          3: 'pending',
+          4: 'recoverable'
+        }
+        statusStr = (statusMap[vtxo.status] || '').toLowerCase()
+      } else if (vtxo.status && typeof vtxo.status === 'object') {
+        // Try multiple possible property names
+        const possibleStatus = vtxo.status.value || 
+                              vtxo.status.type || 
+                              vtxo.status.state || 
+                              vtxo.status.name ||
+                              vtxo.status.status
+        statusStr = String(possibleStatus || '').toLowerCase()
+      }
+      
+      // Also check if the VTXO object itself has a direct status indicator
+      if (!statusStr && vtxo.state) {
+        statusStr = String(vtxo.state).toLowerCase()
+      }
+      
+      // Show settled, pre-confirmed, and confirmed VTXOs
+      const isMatch = statusStr === 'settled' || 
+                      statusStr === 'pre-confirmed' || 
+                      statusStr === 'preconfirmed' ||
+                      statusStr === 'confirmed'
+      
+      console.log('Status string:', statusStr, 'Match:', isMatch)
+      console.log('========================')
+      return isMatch
+    })
+    
+    console.log('Filtered VTXOs (before balance check):', filteredVtxos)
+    console.log('Total VTXO value:', filteredVtxos.reduce((sum, v) => sum + (v.value || 0), 0))
+    
+    // Final filter: Only show VTXOs that match the available balance
+    // Sort by creation date (newest first) and take VTXOs until we match the balance
+    const sortedVtxos = [...filteredVtxos].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return dateB - dateA // Newest first
+    })
+    
+    const targetBalance = arkadeBalance.value
+    console.log('Target balance:', targetBalance)
+    console.log('All filtered VTXOs:', sortedVtxos.map(v => ({ value: v.value, createdAt: v.createdAt })))
+    
+    // Strategy: Take VTXOs greedily but stop if adding the next one would exceed the balance
+    let runningTotal = 0
+    const finalVtxos = []
+    
+    for (const vtxo of sortedVtxos) {
+      const vtxoValue = vtxo.value || 0
+      const newTotal = runningTotal + vtxoValue
+      
+      console.log(`Considering VTXO: ${vtxoValue} sats. Current total: ${runningTotal}, new total would be: ${newTotal}`)
+      
+      // Only add if it doesn't exceed the target balance
+      if (newTotal <= targetBalance) {
+        finalVtxos.push(vtxo)
+        runningTotal = newTotal
+        console.log(`✓ Added VTXO: ${vtxoValue} sats, running total: ${runningTotal}`)
+      } else {
+        console.log(`✗ Skipped VTXO: ${vtxoValue} sats (would exceed balance: ${newTotal} > ${targetBalance})`)
+      }
+      
+      // If we've exactly matched the balance, stop
+      if (runningTotal === targetBalance) {
+        console.log(`✓ Exact match reached: ${runningTotal} === ${targetBalance}`)
+        break
+      }
+    }
+    
+    console.log('Final VTXOs:', finalVtxos)
+    console.log('Final total:', runningTotal)
+    
+    vtxos.value = finalVtxos
     showMenu.value = false
-    showSuccess(`✅ Loaded ${vtxoList.length} VTXOs`)
+    showSuccess(`✅ Loaded ${filteredVtxos.length} VTXOs${boardingBalance.value > 0 ? ` • ${boardingBalance.value} sats ready to board` : ''}`)
   } catch (error) {
+    console.error('Load VTXOs error:', error)
     showError(`❌ Failed to load VTXOs: ${error.message}`)
   } finally {
     loading.value = false
+  }
+}
+
+const selectVtxo = (vtxo) => {
+  // Toggle selection
+  if (selectedVtxo.value === vtxo) {
+    selectedVtxo.value = null
+    encryptAmountArkade.value = null
+    showInfo('VTXO deselected')
+  } else {
+    selectedVtxo.value = vtxo
+    // Auto-fill the encrypt amount with the VTXO value MINUS fee
+    // Fee calculation matches useWalletBridge: 5% with 10 sat minimum
+    const vtxoAmount = vtxo.value || 0
+    const fee = Math.max(10, Math.ceil(vtxoAmount * 0.05))
+    const receiveAmount = vtxoAmount - fee
+    encryptAmountArkade.value = receiveAmount
+    showSuccess(`✅ Selected ${vtxoAmount} sats VTXO → You'll receive ${receiveAmount} sats (~${fee} sat routing fee)`)
   }
 }
 
@@ -767,6 +1126,65 @@ const closeArkadeSendModal = () => {
   closeModal('arkadeSend')
 }
 
+// Helper functions for VTXO status
+const getVtxoStatusLabel = (vtxo) => {
+  // The actual status is in virtualStatus.state
+  let statusStr = ''
+  
+  if (vtxo.virtualStatus && vtxo.virtualStatus.state) {
+    statusStr = String(vtxo.virtualStatus.state).toLowerCase()
+  } else if (typeof vtxo.status === 'string') {
+    statusStr = vtxo.status.toLowerCase()
+  } else if (typeof vtxo.status === 'number') {
+    const statusMap = {
+      0: 'settled',
+      1: 'confirmed',
+      2: 'preconfirmed',
+      3: 'pending',
+      4: 'recoverable'
+    }
+    statusStr = (statusMap[vtxo.status] || 'unknown').toLowerCase()
+  } else if (vtxo.status && typeof vtxo.status === 'object') {
+    statusStr = String(vtxo.status.value || vtxo.status.type || 'unknown').toLowerCase()
+  } else {
+    statusStr = 'unknown'
+  }
+  
+  if (statusStr === 'settled') return '✓ Settled'
+  if (statusStr === 'pre-confirmed' || statusStr === 'preconfirmed') return '⏳ Pre-Confirmed'
+  if (statusStr === 'confirmed') return '🔗 Confirmed'
+  
+  return statusStr.charAt(0).toUpperCase() + statusStr.slice(1)
+}
+
+const getVtxoStatusClass = (vtxo) => {
+  // The actual status is in virtualStatus.state
+  let statusStr = ''
+  
+  if (vtxo.virtualStatus && vtxo.virtualStatus.state) {
+    statusStr = String(vtxo.virtualStatus.state).toLowerCase()
+  } else if (typeof vtxo.status === 'string') {
+    statusStr = vtxo.status.toLowerCase()
+  } else if (typeof vtxo.status === 'number') {
+    const statusMap = {
+      0: 'settled',
+      1: 'confirmed',
+      2: 'preconfirmed',
+      3: 'pending',
+      4: 'recoverable'
+    }
+    statusStr = (statusMap[vtxo.status] || '').toLowerCase()
+  } else if (vtxo.status && typeof vtxo.status === 'object') {
+    statusStr = String(vtxo.status.value || vtxo.status.type || '').toLowerCase()
+  }
+  
+  if (statusStr === 'settled') return 'status-settled'
+  if (statusStr === 'pre-confirmed' || statusStr === 'preconfirmed') return 'status-preconfirmed'
+  if (statusStr === 'confirmed') return 'status-confirmed'
+  
+  return 'status-default'
+}
+
 // Initialize on mount
 onMounted(async () => {
   try {
@@ -797,19 +1215,15 @@ onUnmounted(() => {
 <style scoped>
 .unified-wallet {
   min-height: 100vh;
-  padding: 2.5rem;
+  padding: 3rem 4rem;
   transition: background 0.5s ease;
-  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 0;
-  max-width: 600px;
-  margin: 0 auto;
-  background: #171A21;
+  background: #0B0D11;
 }
 
 /* Wallet Views */
 .wallet-view {
-  max-width: 500px;
-  margin: 0 auto;
+  max-width: 800px;
   color: white;
 }
 
@@ -1452,7 +1866,7 @@ onUnmounted(() => {
   position: absolute;
   width: 7rem;
   height: 7rem;
-  background: #171A21;
+  background: #0B0D11;
   border-radius: 50%;
   z-index: 1;
 }
@@ -1606,11 +2020,11 @@ onUnmounted(() => {
 
 .modal-content {
   background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
-  padding: 2rem;
+  padding: 2.5rem;
   border-radius: 16px;
-  max-width: 500px;
+  max-width: 600px;
   width: 100%;
-  max-height: 80vh;
+  max-height: 85vh;
   overflow-y: auto;
   border: 1px solid rgba(79, 195, 247, 0.3);
 }
@@ -1949,6 +2363,18 @@ onUnmounted(() => {
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+  .unified-wallet {
+    padding: 2.5rem 3rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .unified-wallet {
+    padding: 2rem 2rem;
+  }
+}
+
 @media (max-width: 600px) {
   .unified-wallet {
     padding: 1.5rem;
@@ -2032,6 +2458,502 @@ onUnmounted(() => {
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.7);
   text-align: center;
+}
+
+/* Arkade Layout with Right Panel */
+.arkade-layout {
+  display: grid;
+  grid-template-columns: 800px 1fr;
+  gap: 3rem;
+  align-items: start;
+}
+
+/* Right Panel */
+.right-panel {
+  background: #171A21;
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  min-height: 700px;
+}
+
+.panel-header {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.75rem;
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.panel-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.panel-tab.active {
+  background: linear-gradient(135deg, #00F2E1 0%, #FFD900 100%);
+  color: #161920;
+  font-weight: 700;
+}
+
+.panel-content {
+  color: white;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.panel-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+.panel-description {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 0.5rem 0;
+}
+
+.vtxo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.panel-action-btn {
+  padding: 1rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.panel-action-btn.secondary {
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+}
+
+.panel-action-btn.secondary:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.panel-action-btn.primary {
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+.panel-action-btn.primary:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.panel-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.boarding-balance-card {
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.boarding-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.boarding-icon {
+  font-size: 1.5rem;
+}
+
+.boarding-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.boarding-amount {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: white;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+}
+
+.boarding-unit {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.boarding-description {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.onboard-info {
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 8px;
+  padding: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.onboard-info.info {
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+}
+
+.onboard-info p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.deposit-options-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.address-display-panel {
+  margin-top: 1rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+}
+
+.address-type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #00F2E1;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.5rem;
+}
+
+.address-box-panel {
+  font-family: monospace;
+  font-size: 0.8rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  word-break: break-all;
+  cursor: pointer;
+  margin-bottom: 0.75rem;
+  color: white;
+  transition: background 0.2s ease;
+  width: 100%;
+}
+
+.address-box-panel:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.copy-btn-panel {
+  width: 100%;
+  padding: 0.625rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-btn-panel:hover {
+  background: rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.vtxos-list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.vtxo-item-panel {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.875rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.vtxo-item-panel:hover {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(0, 242, 225, 0.2);
+  transform: translateY(-1px);
+}
+
+.vtxo-item-panel.selected {
+  background: rgba(0, 242, 225, 0.1);
+  border-color: rgba(0, 242, 225, 0.5);
+  border-width: 2px;
+  box-shadow: 0 0 20px rgba(0, 242, 225, 0.2);
+}
+
+.vtxo-selected-indicator {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vtxo-header-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.vtxo-status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vtxo-status-badge.status-settled {
+  background: rgba(102, 187, 106, 0.2);
+  color: #66bb6a;
+  border: 1px solid rgba(102, 187, 106, 0.3);
+}
+
+.vtxo-status-badge.status-preconfirmed {
+  background: rgba(255, 217, 0, 0.2);
+  color: #FFD900;
+  border: 1px solid rgba(255, 217, 0, 0.3);
+}
+
+.vtxo-status-badge.status-confirmed {
+  background: rgba(0, 242, 225, 0.2);
+  color: #00F2E1;
+  border: 1px solid rgba(0, 242, 225, 0.3);
+}
+
+.vtxo-status-badge.status-default {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.vtxo-amount-badge {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: white;
+  font-family: monospace;
+}
+
+.vtxo-detail-panel {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  color: white;
+  font-size: 0.8rem;
+}
+
+.vtxo-label {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vtxo-value {
+  color: rgba(255, 255, 255, 0.9);
+  font-family: monospace;
+}
+
+.vtxo-value.small {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.encryption-preview {
+  background: linear-gradient(135deg, rgba(0, 242, 225, 0.1) 0%, rgba(255, 217, 0, 0.1) 100%);
+  border: 1px solid rgba(0, 242, 225, 0.3);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.875rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.preview-icon {
+  font-size: 1.25rem;
+}
+
+.preview-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #00F2E1;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.preview-row.total {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.preview-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.preview-value {
+  color: white;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.preview-value.fee {
+  color: #FF8E53;
+}
+
+.preview-row.total .preview-label {
+  color: white;
+  font-weight: 700;
+}
+
+.preview-row.total .preview-value {
+  color: #00F2E1;
+  font-size: 1.25rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.875rem;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
+}
+
+.loading-state p {
+  margin: 0;
+}
+
+.qr-code-panel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 10px;
+  margin: 1rem 0;
+  width: 100%;
+}
+
+.qr-code-panel canvas {
+  display: block;
+  border-radius: 6px;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .arkade-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .right-panel {
+    width: 100%;
+    max-width: 800px;
+  }
 }
 </style>
 

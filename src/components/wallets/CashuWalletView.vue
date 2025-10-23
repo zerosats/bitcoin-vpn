@@ -1,37 +1,44 @@
 <template>
   <div class="wallet-view encrypted">
-    <div class="balance-display encrypted-balance">
-      <div class="balance-label">balance</div>
-      <div class="balance-amount-large encrypted-gradient">
-        {{ balance }} <span class="unit-btc encrypted-gradient">sats</span>
-      </div>
-    </div>
+    <!-- Desktop Layout: Balance on left, Actions on right -->
+    <div class="desktop-layout">
+      <div class="balance-section">
+        <div class="balance-display encrypted-balance">
+          <div class="balance-label">balance</div>
+          <div class="balance-amount-large encrypted-gradient">
+            {{ balance }} <span class="unit-btc encrypted-gradient">sats</span>
+          </div>
+        </div>
 
-    <!-- Privacy Information -->
-    <div class="time-at-rest-new">
-      <div class="time-progress-card" :class="{ 'dismissed': privacyMessageDismissed }">
-        <button @click="dismissPrivacyMessage" class="close-button" aria-label="Dismiss message">
-          ✕
-        </button>
-        <div class="privacy-info-content">
-          <h3 class="privacy-header">{{ balance > 0 ? 'Funds are encrypted' : 'Encrypt funds' }}</h3>
-          <p class="privacy-body">
-            {{ balance > 0 
-              ? 'Spend your funds from this balance for improved privacy' 
-              : 'Encrypt funds from your public balance for spending' }}
-          </p>
+        <!-- Privacy Information -->
+        <div class="time-at-rest-new">
+          <div class="time-progress-card" :class="{ 'dismissed': privacyMessageDismissed }">
+            <button @click="dismissPrivacyMessage" class="close-button" aria-label="Dismiss message">
+              ✕
+            </button>
+            <div class="privacy-info-content">
+              <h3 class="privacy-header">{{ balance > 0 ? 'Funds are encrypted' : 'Encrypt funds' }}</h3>
+              <p class="privacy-body">
+                {{ balance > 0 
+                  ? 'Spend your funds from this balance for improved privacy' 
+                  : 'Encrypt funds from your public balance for spending' }}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Action Buttons -->
-    <div class="action-buttons-new">
-      <button @click="$emit('send')" class="action-btn-gradient">
-        SEND ↗
-      </button>
-      <button @click="$emit('receive')" class="action-btn-gradient">
-        RECEIVE ↙
-      </button>
+      <!-- Action Buttons -->
+      <div class="actions-section">
+        <div class="action-buttons-new">
+          <button @click="$emit('send')" class="action-btn-gradient">
+            SEND ↗
+          </button>
+          <button @click="$emit('receive')" class="action-btn-gradient">
+            RECEIVE ↙
+          </button>
+        </div>
+      </div>
     </div>
 
     <p class="info-text-encrypted">
@@ -65,8 +72,7 @@ const dismissPrivacyMessage = () => {
 <style scoped>
 /* Wallet Views */
 .wallet-view {
-  max-width: 500px;
-  margin: 0 auto;
+  max-width: 800px;
   color: white;
 }
 
@@ -87,11 +93,11 @@ const dismissPrivacyMessage = () => {
 }
 
 .encrypted-balance {
-  margin-bottom: 14.5rem;
+  margin-bottom: 2rem;
 }
 
 .encrypted-balance .balance-label {
-  font-size: 1.875rem;
+  font-size: 1.5rem;
   font-weight: 900;
   letter-spacing: 0.01em;
   line-height: 1.4;
@@ -102,9 +108,9 @@ const dismissPrivacyMessage = () => {
 }
 
 .balance-amount-large {
-  font-size: 9rem;
+  font-size: 4.5rem;
   font-weight: 900;
-  line-height: 1.4;
+  line-height: 1.2;
   letter-spacing: 1.25px;
   text-transform: uppercase;
   background: linear-gradient(180deg, #ff4b2b 0%, #00f2e1 100%);
@@ -114,7 +120,7 @@ const dismissPrivacyMessage = () => {
 }
 
 .unit-btc {
-  font-size: 1.875rem;
+  font-size: 1.25rem;
   letter-spacing: 0.3px;
   margin-left: -0.5rem;
   background: linear-gradient(180deg, #ff4b2b 0%, #00f2e1 100%);
@@ -148,7 +154,7 @@ const dismissPrivacyMessage = () => {
   border-radius: 14px;
   overflow: hidden;
   box-shadow: inset 0px 2px 0px 0px rgba(255, 255, 255, 0.06);
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.25rem;
   position: relative;
   opacity: 1;
   visibility: visible;
@@ -187,33 +193,53 @@ const dismissPrivacyMessage = () => {
 
 .privacy-header {
   color: rgba(255, 255, 255, 0.95);
-  font-size: 1.5rem;
+  font-size: 1.125rem;
   font-weight: 600;
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.5rem 0;
   line-height: 1.4;
 }
 
 .privacy-body {
   color: rgba(255, 255, 255, 0.7);
-  font-size: 1.25rem;
+  font-size: 0.95rem;
   font-weight: 400;
   margin: 0;
   line-height: 1.5;
+}
+
+/* Desktop Layout */
+.desktop-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  align-items: start;
+}
+
+.balance-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.actions-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
 /* New Action Buttons */
 .action-buttons-new {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
-  margin-bottom: 2rem;
+  gap: 1.5rem;
+  width: 100%;
 }
 
 .action-btn-gradient {
-  height: 161px;
+  height: 120px;
   border: none;
   border-radius: 14px;
-  font-size: 1.375rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.6592px;
   line-height: 0.9;
@@ -239,12 +265,41 @@ const dismissPrivacyMessage = () => {
 }
 
 /* Responsive */
+@media (max-width: 768px) {
+  .desktop-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .actions-section {
+    padding-top: 0;
+  }
+
+  .action-buttons-new {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .action-btn-gradient {
+    height: 100px;
+    font-size: 1.1rem;
+  }
+}
+
 @media (max-width: 600px) {
+  .wallet-view {
+    max-width: 100%;
+  }
+
   .balance-amount-large {
-    font-size: 4rem;
+    font-size: 3.5rem;
   }
 
   .unit-btc {
+    font-size: 1rem;
+  }
+
+  .encrypted-balance .balance-label {
     font-size: 1.2rem;
   }
 
@@ -254,12 +309,16 @@ const dismissPrivacyMessage = () => {
   }
 
   .action-btn-gradient {
-    height: 120px;
-    font-size: 1.2rem;
+    height: 100px;
+    font-size: 1.1rem;
   }
 
   .days-text {
     font-size: 1.1rem;
+  }
+
+  .desktop-layout {
+    gap: 1.5rem;
   }
 }
 </style>

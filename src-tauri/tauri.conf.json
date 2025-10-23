@@ -121,10 +121,10 @@
         "fullscreen": false,
         "resizable": true,
         "title": "Arkade Wallet",
-        "width": 1000,
-        "height": 700,
-        "minWidth": 800,
-        "minHeight": 600,
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 650,
         "center": true
       }
     ],

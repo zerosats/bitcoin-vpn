@@ -44,34 +44,38 @@ defineEmits(['update:activeTab', 'toggleMenu'])
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 3rem;
-  margin-bottom: 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 3rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .tabs-container {
   display: flex;
-  gap: 0.5rem;
+  gap: 1rem;
   align-items: center;
 }
 
 .tab {
-  padding: 1.125rem 2rem;
+  padding: 1.25rem 3rem;
   background: #1f232b;
   border: none;
   color: #616877;
   font-weight: 700;
-  font-size: 0.75rem;
-  letter-spacing: 1.8px;
+  font-size: 0.875rem;
+  letter-spacing: 2px;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: 14px;
   transition: all 0.3s ease;
   position: relative;
+  min-width: 160px;
 }
 
 .tab.active {
   color: white;
   background: #252933;
+  box-shadow: 0 4px 12px rgba(0, 242, 225, 0.15);
 }
 
 /* Three-dot Menu */

@@ -7,8 +7,9 @@
       </div>
     </div>
 
-    <!-- Encrypt Section -->
-    <div class="encrypt-section-new">
+    <div class="desktop-content">
+      <!-- Encrypt Section -->
+      <div class="encrypt-section-new">
       <!-- From Section -->
       <div class="card-section">
         <div class="card-header-external">
@@ -96,9 +97,10 @@
       <span v-else>Processing...</span>
     </button>
 
-    <p class="warning-text-new">
-      Your Arkade VTXOs are on Bitcoin L2. Encrypt them for enhanced privacy with Cashu ecash.
-    </p>
+      <p class="warning-text-new">
+        Your Arkade VTXOs are on Bitcoin L2. Encrypt them for enhanced privacy with Cashu ecash.
+      </p>
+    </div>
   </div>
 </template>
 
@@ -140,8 +142,7 @@ defineEmits(['update:encryptAmount', 'encryptOrDeposit'])
 <style scoped>
 /* Wallet Views */
 .wallet-view {
-  max-width: 500px;
-  margin: 0 auto;
+  max-width: 800px;
   color: white;
 }
 
@@ -166,7 +167,7 @@ defineEmits(['update:encryptAmount', 'encryptOrDeposit'])
 }
 
 .unprotected-balance .balance-label {
-  font-size: 1.875rem;
+  font-size: 1.5rem;
   font-weight: 900;
   letter-spacing: 0.01em;
   line-height: 1.4;
@@ -177,9 +178,9 @@ defineEmits(['update:encryptAmount', 'encryptOrDeposit'])
 }
 
 .balance-amount-large {
-  font-size: 9rem;
+  font-size: 4.5rem;
   font-weight: 900;
-  line-height: 1.4;
+  line-height: 1.2;
   letter-spacing: 1.25px;
   text-transform: uppercase;
   background: linear-gradient(180deg, #ff4b2b 0%, #00f2e1 100%);
@@ -189,13 +190,17 @@ defineEmits(['update:encryptAmount', 'encryptOrDeposit'])
 }
 
 .unit-btc {
-  font-size: 1.875rem;
+  font-size: 1.25rem;
   letter-spacing: 0.3px;
   margin-left: -0.5rem;
   background: linear-gradient(180deg, #ff4b2b 0%, #00f2e1 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.desktop-content {
+  max-width: 100%;
 }
 
 .encrypt-section-new {
@@ -459,18 +464,32 @@ defineEmits(['update:encryptAmount', 'encryptOrDeposit'])
 }
 
 /* Responsive */
+@media (max-width: 900px) {
+  .desktop-content {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
+  .wallet-view {
+    max-width: 100%;
+  }
+
   .balance-amount-large {
-    font-size: 4rem;
+    font-size: 3.5rem;
   }
 
   .unit-btc {
+    font-size: 1rem;
+  }
+
+  .unprotected-balance .balance-label {
     font-size: 1.2rem;
   }
 
   .swap-icon-background {
-    width: 7rem;
-    height: 7rem;
+    width: 6rem;
+    height: 6rem;
   }
 
   .swap-icon {
@@ -486,6 +505,10 @@ defineEmits(['update:encryptAmount', 'encryptOrDeposit'])
   .max-btn {
     font-size: 0.65rem;
     padding: 0.2rem 0.5rem;
+  }
+
+  .desktop-content {
+    max-width: 100%;
   }
 }
 </style>
