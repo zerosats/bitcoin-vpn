@@ -373,9 +373,10 @@
 /* Empty State */
 .empty-state {
   text-align: center;
-  padding: 2rem 1rem;
+  padding: 1.5rem 1rem;
   color: rgba(255, 255, 255, 0.5);
   font-size: var(--font-size-sm);
+  margin-top: 1rem;
 }
 
 .empty-state p {

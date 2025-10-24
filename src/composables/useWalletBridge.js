@@ -1,10 +1,12 @@
 import { ref, computed, watch } from 'vue'
 import { useCashuWallet } from './useCashuWallet'
 import { useArkadeWallet } from './useArkadeWallet'
+import { useArkadeShadowWallet, initializeShadowWallet } from './useArkadeShadowWallet'
 
 // Shared state for all wallets
 const cashu = useCashuWallet()
 const arkade = useArkadeWallet()
+const arkadeShadow = useArkadeShadowWallet()
 
 // Encryption flow state
 const encryptionInProgress = ref(false)
@@ -232,7 +234,7 @@ export function useWalletBridge() {
     }
   }
 
-  // Arkade decrypt flow: Move funds from Cashu to Arkade
+  // Arkade decrypt flow: Move funds from Cashu to Shadow Arkade wallet
   const decryptArkadeFunds = async (amount) => {
     try {
       if (!amount || amount <= 0) {
@@ -243,8 +245,10 @@ export function useWalletBridge() {
         throw new Error('Cashu wallet not initialized')
       }
 
-      if (!arkade.isInitialized.value) {
-        throw new Error('Arkade wallet not initialized')
+      // Initialize shadow wallet if needed
+      if (!arkadeShadow.isInitialized.value) {
+        console.log('Initializing shadow Arkade wallet for decrypt...')
+        await initializeShadowWallet()
       }
 
       // Check Cashu balance
@@ -252,11 +256,11 @@ export function useWalletBridge() {
         throw new Error('Insufficient balance in Cashu wallet')
       }
 
-      console.log(`🔓 Starting decryption of ${amount} sats from Cashu → Arkade`)
+      console.log(`🔓 Starting decryption of ${amount} sats from Cashu → Shadow Arkade`)
 
-      // Step 1: Arkade creates a Lightning invoice
-      console.log('Step 1: Creating Arkade Lightning invoice...')
-      const invoiceString = await arkade.receiveBolt11(amount, 'Cashu to Arkade')
+      // Step 1: Shadow Arkade creates a Lightning invoice
+      console.log('Step 1: Creating shadow Arkade Lightning invoice...')
+      const invoiceString = await arkadeShadow.receiveBolt11(amount, 'Cashu to Shadow Arkade')
       
       console.log('✅ Invoice created:', invoiceString)
 
@@ -266,14 +270,15 @@ export function useWalletBridge() {
       
       console.log('✅ Invoice paid by Cashu:', paymentResult)
 
-      // Step 3: Wait for Arkade to receive and update balance
-      console.log('Step 3: Waiting for Arkade to receive funds...')
+      // Step 3: Wait for shadow Arkade to receive and update balance
+      console.log('Step 3: Waiting for shadow Arkade to receive funds...')
       // Wait a bit for the reverse swap to complete
       await new Promise(resolve => setTimeout(resolve, 3000))
       
-      await arkade.updateBalance()
+      await arkadeShadow.updateBalance()
 
-      console.log('🎉 Decryption complete! Funds moved from Cashu → Arkade')
+      console.log('🎉 Decryption complete! Funds moved from Cashu → Shadow Arkade wallet')
+      console.log('💡 Use the Cashu withdraw panel to exit these fresh VTXOs to Bitcoin L1')
 
       return {
         success: true,
@@ -289,6 +294,7 @@ export function useWalletBridge() {
     // Wallet instances
     cashu,
     arkade,
+    arkadeShadow,
     
     // Formatted balances
     cashuBalance: cashuBalanceFormatted,
@@ -296,6 +302,7 @@ export function useWalletBridge() {
     
     // Initialization
     initializeBothWallets,
+    initializeShadowWallet,
     
     // Arkade <-> Cashu encryption flow
     encryptArkadeFunds,

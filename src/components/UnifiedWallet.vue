@@ -98,7 +98,7 @@
                 class="panel-action-btn primary"
                 :disabled="!decryptAmount || decryptAmount <= 0 || decryptAmount > Number(cashuBalance) || decrypting"
               >
-                {{ decrypting ? '🔓 Decrypting...' : '🔓 Decrypt to VTXOs' }}
+                {{ decrypting ? 'Decrypting...' : 'Decrypt to VTXOs' }}
               </button>
             </div>
           </div>
@@ -111,18 +111,32 @@
             <p class="panel-description">Exit VTXOs to Bitcoin L1 address</p>
 
             <!-- Load VTXOs Button -->
-            <div class="vtxo-actions" style="margin-bottom: 1.5rem;">
+            <div class="vtxo-actions">
               <button 
                 @click="handleLoadVTXOs" 
                 class="panel-action-btn secondary"
                 :disabled="loading"
               >
-                {{ loading ? 'Loading...' : 'Load VTXOs' }}
+                {{ loading ? 'Loading...' : 'Load confirmed vUTXOs' }}
               </button>
             </div>
 
-            <!-- VTXOs List -->
-            <div v-if="vtxos.length > 0" class="vtxos-list-panel" style="margin-bottom: 1.5rem;">
+            <!-- Batch Settle Button - settles VTXOs to shadow wallet before withdrawal -->
+            <div v-if="vtxos.length > 0" class="vtxo-actions" style="margin-top: 0.5rem;">
+              <button 
+                @click="handleBatchSettle" 
+                class="panel-action-btn primary"
+                :disabled="settling || vtxos.length === 0"
+              >
+                {{ settling ? 'Settling...' : 'Batch Settle VTXOs' }}
+              </button>
+              <p class="panel-description" style="margin-top: 0.5rem; font-size: 0.85rem;">
+                Settle VTXOs before withdrawing to Bitcoin L1 (required for fresh VTXOs)
+              </p>
+            </div>
+
+            <!-- VTXOs List - appears here when loaded, creating space -->
+            <div v-if="vtxos.length > 0" class="vtxos-list-panel">
               <div 
                 v-for="(vtxo, index) in vtxos" 
                 :key="index" 
@@ -152,9 +166,6 @@
                 </div>
               </div>
             </div>
-            <div v-else-if="!loading" class="empty-state" style="margin-bottom: 1.5rem;">
-              <p>No VTXOs loaded. Click "Load VTXOs" to view available VTXOs.</p>
-            </div>
 
             <!-- Withdraw Form -->
             <div class="withdraw-form">
@@ -173,8 +184,13 @@
                 class="panel-action-btn primary"
                 :disabled="!selectedWithdrawVtxo || !withdrawAddress || withdrawing"
               >
-                {{ withdrawing ? '⏳ Withdrawing...' : '💰 Withdraw Selected VTXO' }}
+                {{ withdrawing ? 'Withdrawing...' : 'Withdraw Selected VTXO' }}
               </button>
+            </div>
+
+            <!-- Empty State - shows below withdraw form when no VTXOs -->
+            <div v-if="vtxos.length === 0 && !loading" class="empty-state">
+              <p>No VTXOs loaded. Click "Load confirmed vUTXOs" to view available VTXOs.</p>
             </div>
           </div>
         </div>
@@ -419,8 +435,10 @@ const {
   encryptionStep,
   daysAtRest,
   initializeBothWallets,
+  initializeShadowWallet,
   cashu,
   arkade: arkadeBridge,
+  arkadeShadow,
   cashuMintUrl
 } = useWalletBridge()
 
@@ -465,6 +483,7 @@ const decryptAmount = ref(null)
 const withdrawAmount = ref(null)
 const withdrawAddress = ref('')
 const withdrawing = ref(false)
+const settling = ref(false)
 const sendToken = ref('')
 const showMenu = ref(false)
 const arkadeDepositAddress = ref('')
@@ -537,6 +556,60 @@ const handleDecryptToArkade = async () => {
   }
 }
 
+const handleBatchSettle = async () => {
+  if (vtxos.value.length === 0) {
+    showError('No VTXOs to settle')
+    return
+  }
+  
+  // Calculate total amount to settle
+  const totalAmount = vtxos.value.reduce((sum, vtxo) => sum + (vtxo.value || 0), 0)
+  
+  if (!confirm(`Batch settle ${vtxos.value.length} VTXO(s) totaling ${totalAmount} sats back to shadow wallet?\n\nThis will refresh the VTXOs and make them withdrawable to Bitcoin L1.\n\nWait time: 1-3 minutes for ASP round.`)) return
+  
+  settling.value = true
+  try {
+    // Initialize shadow wallet if needed
+    if (!arkadeShadow.isInitialized.value) {
+      await initializeShadowWallet()
+    }
+    
+    showInfo('🔄 Batch settling VTXOs...')
+    showInfo('⏱️ Please wait 1-3 minutes for ASP round to process...')
+    
+    // Get shadow wallet address to settle to
+    const shadowAddress = await arkadeShadow.updateAddress()
+    console.log('Settling to shadow wallet address:', shadowAddress)
+    
+    // Batch settle all VTXOs back to shadow wallet
+    const txid = await arkadeShadow.wallet.value.settle(
+      {
+        inputs: vtxos.value,
+        outputs: [{
+          address: shadowAddress,
+          amount: BigInt(totalAmount)
+        }]
+      },
+      (event) => {
+        console.log('Batch settlement event:', event)
+      }
+    )
+    
+    showSuccess(`✅ Batch settlement initiated! TXID: ${txid.substring(0, 8)}...`)
+    showSuccess('🎉 Wait 1-3 minutes, then reload VTXOs to see fresh settled VTXOs!')
+    
+    // Clear VTXOs list (they'll need to reload after settlement)
+    vtxos.value = []
+    selectedWithdrawVtxo.value = null
+    
+  } catch (error) {
+    console.error('Batch settle error:', error)
+    showError(`❌ Batch settlement failed: ${error.message}`)
+  } finally {
+    settling.value = false
+  }
+}
+
 const handleWithdrawBitcoin = async () => {
   const vtxo = selectedWithdrawVtxo.value
   const address = withdrawAddress.value
@@ -548,11 +621,17 @@ const handleWithdrawBitcoin = async () => {
   
   const amount = vtxo.value || 0
   
-  if (!confirm(`Withdraw ${amount} sats to ${address}?\n\nThis will exit the selected VTXO from Ark to Bitcoin L1.`)) return
+  if (!confirm(`Withdraw ${amount} sats to ${address}?\n\nThis will exit the selected VTXO from shadow wallet to Bitcoin L1.`)) return
   
   withdrawing.value = true
   try {
-    await arkade.cooperativeExit(address, amount)
+    // Initialize shadow wallet if needed
+    if (!arkadeShadow.isInitialized.value) {
+      await initializeShadowWallet()
+    }
+    
+    // Use SHADOW wallet for withdrawal
+    await arkadeShadow.cooperativeExit(address, amount, vtxo)
     showSuccess(`✅ Successfully initiated withdrawal of ${amount} sats!`)
     
     // Clear selection and input
@@ -560,9 +639,9 @@ const handleWithdrawBitcoin = async () => {
     withdrawAmount.value = null
     withdrawAddress.value = ''
     
-    // Refresh VTXOs and balances
+    // Refresh shadow wallet VTXOs and balances
     await handleLoadVTXOs()
-    await arkade.updateBalance()
+    await arkadeShadow.updateBalance()
   } catch (error) {
     console.error('Withdraw error:', error)
     showError(`❌ Withdrawal failed: ${error.message}`)
@@ -1071,26 +1150,89 @@ const handleResetArkadeWallet = async () => {
 const handleLoadVTXOs = async () => {
   loading.value = true
   try {
-    // Get balance to check boarding amount
-    const balanceData = await arkade.updateBalance()
-    console.log('Balance data:', balanceData)
+    // Determine which wallet to use based on active tab
+    const isArkadeTab = activeTab.value === 'arkade'
+    const isCashuTab = activeTab.value === 'encrypted'
     
-    // Extract boarding confirmed balance
-    if (balanceData && balanceData.boarding) {
-      if (typeof balanceData.boarding === 'object') {
-        boardingBalance.value = Number(balanceData.boarding.confirmed || 0)
+    let walletToUse
+    let balanceData
+    let allVtxos
+    let targetBalance
+    
+    if (isArkadeTab) {
+      // Load from MAIN Arkade wallet
+      console.log('📍 Loading VTXOs from MAIN Arkade wallet...')
+      walletToUse = arkade
+      
+      // Get balance from MAIN wallet
+      balanceData = await arkade.updateBalance()
+      console.log('Main wallet balance data:', balanceData)
+      
+      // Extract boarding confirmed balance from main wallet
+      if (balanceData && balanceData.boarding) {
+        if (typeof balanceData.boarding === 'object') {
+          boardingBalance.value = Number(balanceData.boarding.confirmed || 0)
+        } else {
+          boardingBalance.value = Number(balanceData.boarding || 0)
+        }
       } else {
-        boardingBalance.value = Number(balanceData.boarding || 0)
+        boardingBalance.value = 0
       }
+      
+      console.log('Main wallet boarding balance:', boardingBalance.value)
+      
+      // Get VTXOs from MAIN wallet
+      allVtxos = await arkade.getVTXOs()
+      console.log('Main wallet VTXOs:', allVtxos)
+      console.log('Main wallet available balance:', arkade.balance.value)
+      targetBalance = arkade.balance.value
+      
+    } else if (isCashuTab) {
+      // Load from SHADOW Arkade wallet (for Cashu withdraw)
+      console.log('🌑 Loading VTXOs from SHADOW Arkade wallet...')
+      
+      // Initialize shadow wallet if needed
+      if (!arkadeShadow.isInitialized.value) {
+        console.log('Initializing shadow Arkade wallet...')
+        await initializeShadowWallet()
+      }
+      
+      walletToUse = arkadeShadow
+      
+      // Get balance from SHADOW wallet
+      balanceData = await arkadeShadow.updateBalance()
+      console.log('Shadow wallet balance data:', balanceData)
+      
+      // Extract boarding confirmed balance from shadow wallet
+      if (balanceData && balanceData.boarding) {
+        if (typeof balanceData.boarding === 'object') {
+          boardingBalance.value = Number(balanceData.boarding.confirmed || 0)
+        } else {
+          boardingBalance.value = Number(balanceData.boarding || 0)
+        }
+      } else {
+        boardingBalance.value = 0
+      }
+      
+      console.log('Shadow wallet boarding balance:', boardingBalance.value)
+      
+      // Get VTXOs from SHADOW wallet
+      allVtxos = await arkadeShadow.getVTXOs()
+      console.log('Shadow wallet VTXOs:', allVtxos)
+      console.log('Shadow wallet available balance:', arkadeShadow.balance.value)
+      targetBalance = arkadeShadow.balance.value
     } else {
+      // Unknown tab, default to shadow for safety
+      console.warn('Unknown tab:', activeTab.value, 'defaulting to shadow wallet')
+      walletToUse = arkadeShadow
+      if (!arkadeShadow.isInitialized.value) {
+        await initializeShadowWallet()
+      }
+      balanceData = await arkadeShadow.updateBalance()
+      allVtxos = await arkadeShadow.getVTXOs()
+      targetBalance = arkadeShadow.balance.value
       boardingBalance.value = 0
     }
-    
-    console.log('Boarding balance:', boardingBalance.value)
-    
-    const allVtxos = await arkade.getVTXOs()
-    console.log('All VTXOs from SDK:', allVtxos)
-    console.log('Available balance:', arkadeBalance.value)
     
     // Filter to only show: settled, pre-confirmed, or confirmed VTXOs
     // AND only show unspent VTXOs (part of current balance)
@@ -1205,8 +1347,8 @@ const handleLoadVTXOs = async () => {
       return dateB - dateA // Newest first
     })
     
-    const targetBalance = arkadeBalance.value
-    console.log('Target balance:', targetBalance)
+    // targetBalance already set above based on active tab
+    console.log('Target balance:', targetBalance, '(from', isArkadeTab ? 'MAIN' : 'SHADOW', 'wallet)')
     console.log('All filtered VTXOs:', sortedVtxos.map(v => ({ value: v.value, createdAt: v.createdAt })))
     
     // Strategy: Take VTXOs greedily but stop if adding the next one would exceed the balance
@@ -1380,12 +1522,21 @@ onMounted(async () => {
     await cashu.initialize()
     console.log('Cashu wallet initialized')
     
-    // Initialize Arkade wallet
+    // Initialize shadow Arkade wallet FIRST (for Cashu operations)
+    try {
+      await initializeShadowWallet()
+      console.log('Shadow Arkade wallet initialized')
+    } catch (error) {
+      console.error('Failed to initialize shadow Arkade wallet:', error)
+      // Don't fail the entire mount, just log it
+    }
+    
+    // Initialize main Arkade wallet AFTER shadow (ensures main wallet key is restored)
     try {
       await arkade.initialize()
-      console.log('Arkade wallet initialized')
+      console.log('Main Arkade wallet initialized')
     } catch (error) {
-      console.error('Failed to initialize Arkade wallet:', error)
+      console.error('Failed to initialize main Arkade wallet:', error)
       // Don't fail the entire mount, just log it
     }
   } catch (error) {
