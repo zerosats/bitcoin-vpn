@@ -345,8 +345,8 @@ export function useArkadeWallet() {
     try {
       if (!wallet.value) throw new Error('Wallet not initialized')
       
-      const addr = await wallet.value.getAddress()
-      const vtxos = await wallet.value.walletRepository.getVtxos(addr)
+      // Use SDK method to get VTXOs in proper format for settlement
+      const vtxos = await wallet.value.getVtxos({ withRecoverable: true })
       console.log('VTXOs:', vtxos)
       return vtxos
     } catch (error) {
@@ -516,10 +516,71 @@ export function useArkadeWallet() {
     }
   }
 
-  const cooperativeExit = async (address) => {
-    // Placeholder for future exit implementation
-    console.log('Cooperative exit to:', address)
-    throw new Error('Cooperative exit not yet implemented')
+  const cooperativeExit = async (address, amount, vtxo = null) => {
+    try {
+      if (!wallet.value) throw new Error('Wallet not initialized')
+      
+      console.log('Starting cooperative exit via wallet.settle()...')
+      console.log('Exit to address:', address)
+      console.log('Amount:', amount, 'sats')
+      console.log('VTXO:', vtxo)
+      
+      // Validate address format (basic check)
+      if (!address || address.length < 26) {
+        throw new Error('Invalid Bitcoin address')
+      }
+      
+      // If specific VTXO is provided, use it. Otherwise get VTXOs to settle
+      let vtxosToSettle = []
+      
+      if (vtxo) {
+        // Use the specific VTXO provided
+        vtxosToSettle = [vtxo]
+      } else {
+        // Get all VTXOs using SDK method (includes proper formatting for settlement)
+        const allVtxos = await wallet.value.getVtxos({ withRecoverable: true })
+        
+        // Find VTXOs that match the requested amount
+        let accumulated = 0
+        for (const v of allVtxos) {
+          if (accumulated >= amount) break
+          vtxosToSettle.push(v)
+          accumulated += v.value || 0
+        }
+        
+        if (accumulated < amount) {
+          throw new Error(`Insufficient VTXOs. Need ${amount} sats, found ${accumulated} sats`)
+        }
+      }
+      
+      console.log(`Settling ${vtxosToSettle.length} VTXO(s) to Bitcoin address...`)
+      
+      // Settle VTXOs to Bitcoin L1 address
+      const txid = await wallet.value.settle(
+        {
+          inputs: vtxosToSettle,
+          outputs: [
+            { 
+              address: address, 
+              amount: BigInt(amount) 
+            }
+          ]
+        },
+        (event) => {
+          console.log('Settlement event:', event)
+        }
+      )
+      
+      console.log('✅ Settlement successful! TXID:', txid)
+      
+      // Update balance after exit
+      await updateBalance()
+      
+      return txid
+    } catch (error) {
+      console.error('Failed to settle/exit:', error)
+      throw error
+    }
   }
 
 

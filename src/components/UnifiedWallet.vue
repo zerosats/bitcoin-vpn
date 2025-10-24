@@ -19,6 +19,9 @@
               <button @click="() => { handleDecryptToArkade(); showMenu = false }" class="menu-item" :disabled="!cashuBalance || decrypting">
                 {{ decrypting ? '🔓 Decrypting...' : '🔓 Decrypt to Arkade' }}
               </button>
+              <button @click="openModal('shadowSend'); showMenu = false" class="menu-item">
+                📤 Send from Shadow Wallet
+              </button>
             </template>
             <!-- Arkade Advanced Options -->
             <template v-else-if="activeTab === 'arkade'">
@@ -50,6 +53,151 @@
         @send="openModal('send')"
         @receive="openModal('receive')"
       />
+      
+      <!-- Right Side Panel -->
+      <div class="right-panel">
+        <div class="panel-header">
+          <button 
+            @click="cashuRightPanelView = 'decrypt'" 
+            :class="['panel-tab', { active: cashuRightPanelView === 'decrypt' }]"
+          >
+            Decrypt
+          </button>
+          <button 
+            @click="cashuRightPanelView = 'withdraw'" 
+            :class="['panel-tab', { active: cashuRightPanelView === 'withdraw' }]"
+          >
+            Withdraw
+          </button>
+        </div>
+
+        <!-- Decrypt View -->
+        <div v-if="cashuRightPanelView === 'decrypt'" class="panel-content">
+          <div class="panel-section">
+            <h3 class="panel-title">Decrypt to VTXOs</h3>
+            <p class="panel-description">Convert Cashu back to fresh Arkade VTXOs</p>
+            
+            <div class="decrypt-form">
+              <div class="amount-input-panel">
+                <label class="input-label">Amount (sats)</label>
+                <input 
+                  v-model.number="decryptAmount"
+                  type="number" 
+                  class="amount-field-panel"
+                  placeholder="Enter amount"
+                  :max="cashuBalance"
+                >
+                <button 
+                  @click="decryptAmount = Number(cashuBalance)" 
+                  class="max-button-panel"
+                  :disabled="!cashuBalance || cashuBalance === '0'"
+                >
+                  MAX
+                </button>
+              </div>
+
+              <button 
+                @click="handleDecryptToArkade" 
+                class="panel-action-btn primary"
+                :disabled="!decryptAmount || decryptAmount <= 0 || decryptAmount > Number(cashuBalance) || decrypting"
+              >
+                {{ decrypting ? 'Decrypting...' : 'Decrypt to VTXOs' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Withdraw View -->
+        <div v-if="cashuRightPanelView === 'withdraw'" class="panel-content">
+          <div class="panel-section">
+            <h3 class="panel-title">Withdraw to Bitcoin</h3>
+            <p class="panel-description">Exit VTXOs to Bitcoin L1 address</p>
+
+            <!-- Load VTXOs Button -->
+            <div class="vtxo-actions">
+              <button 
+                @click="handleLoadVTXOs" 
+                class="panel-action-btn secondary"
+                :disabled="loading"
+              >
+                {{ loading ? 'Loading...' : 'Load confirmed vUTXOs' }}
+              </button>
+            </div>
+
+            <!-- Batch Settle Button - settles VTXOs to shadow wallet before withdrawal -->
+            <div v-if="vtxos.length > 0" class="vtxo-actions" style="margin-top: 0.5rem;">
+              <button 
+                @click="handleBatchSettle" 
+                class="panel-action-btn primary"
+                :disabled="settling || vtxos.length === 0"
+              >
+                {{ settling ? 'Settling...' : 'Batch Settle VTXOs' }}
+              </button>
+              <p class="panel-description" style="margin-top: 0.5rem; font-size: 0.85rem;">
+                Settle VTXOs before withdrawing to Bitcoin L1 (required for fresh VTXOs)
+              </p>
+            </div>
+
+            <!-- VTXOs List - appears here when loaded, creating space -->
+            <div v-if="vtxos.length > 0" class="vtxos-list-panel">
+              <div 
+                v-for="(vtxo, index) in vtxos" 
+                :key="index" 
+                class="vtxo-item-panel"
+                :class="{ 'selected': selectedWithdrawVtxo === vtxo }"
+                @click="selectWithdrawVtxo(vtxo)"
+                title="Click to select for withdrawal"
+              >
+                <div class="vtxo-header-panel">
+                  <span class="vtxo-status-badge" :class="getVtxoStatusClass(vtxo)">
+                    {{ getVtxoStatusLabel(vtxo) }}
+                  </span>
+                  <span class="vtxo-amount-badge">{{ vtxo.value || vtxo.amount || 0 }} sats</span>
+                </div>
+                <div class="vtxo-detail-panel">
+                  <span class="vtxo-label">TXID:</span>
+                  <span class="vtxo-value small">{{ vtxo.txid?.substring(0, 20) }}...</span>
+                </div>
+                <div v-if="vtxo.vout !== undefined" class="vtxo-detail-panel">
+                  <span class="vtxo-label">Output:</span>
+                  <span class="vtxo-value">{{ vtxo.vout }}</span>
+                </div>
+                
+                <!-- Selection indicator -->
+                <div v-if="selectedWithdrawVtxo === vtxo" class="vtxo-selected-indicator">
+                  ✓ Selected for withdrawal
+                </div>
+              </div>
+            </div>
+
+            <!-- Withdraw Form -->
+            <div class="withdraw-form">
+              <div class="address-input-panel">
+                <label class="input-label">Bitcoin Address</label>
+                <input 
+                  v-model="withdrawAddress"
+                  type="text" 
+                  class="address-field-panel"
+                  placeholder="bc1..."
+                >
+              </div>
+
+              <button 
+                @click="handleWithdrawBitcoin" 
+                class="panel-action-btn primary"
+                :disabled="!selectedWithdrawVtxo || !withdrawAddress || withdrawing"
+              >
+                {{ withdrawing ? 'Withdrawing...' : 'Withdraw Selected VTXO' }}
+              </button>
+            </div>
+
+            <!-- Empty State - shows below withdraw form when no VTXOs -->
+            <div v-if="vtxos.length === 0 && !loading" class="empty-state">
+              <p>No VTXOs loaded. Click "Load confirmed vUTXOs" to view available VTXOs.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Arkade View with Right Panel -->
@@ -256,6 +404,15 @@
       @send="handleSendArkade"
     />
 
+    <!-- Shadow Wallet Send Modal -->
+    <ArkadeSendModal 
+      :show="modals.shadowSend"
+      :sending="sending"
+      :balance="arkadeShadow.balance.value ? arkadeShadow.balance.value.toString() : '0'"
+      @close="closeShadowSendModal"
+      @send="handleSendFromShadow"
+    />
+
     <!-- Messages -->
     <Toast :message="message" :type="messageType" />
   </div>
@@ -290,8 +447,10 @@ const {
   encryptionStep,
   daysAtRest,
   initializeBothWallets,
+  initializeShadowWallet,
   cashu,
   arkade: arkadeBridge,
+  arkadeShadow,
   cashuMintUrl
 } = useWalletBridge()
 
@@ -329,15 +488,22 @@ const arkadeBalance = computed(() => {
 
 // State
 const activeTab = ref('arkade')
-const rightPanelView = ref('vtxos') // 'vtxos' or 'deposit'
+const rightPanelView = ref('vtxos') // 'vtxos' or 'deposit' (Arkade panel)
+const cashuRightPanelView = ref('decrypt') // 'decrypt' or 'withdraw' (Cashu panel)
 const encryptAmountArkade = ref(null)
+const decryptAmount = ref(null)
+const withdrawAmount = ref(null)
+const withdrawAddress = ref('')
+const withdrawing = ref(false)
+const settling = ref(false)
 const sendToken = ref('')
 const showMenu = ref(false)
 const arkadeDepositAddress = ref('')
 const arkadeDepositAddressType = ref('')
 const arkadeInvoiceQRCode = ref('')
 const vtxos = ref([])
-const selectedVtxo = ref(null)
+const selectedVtxo = ref(null) // For Arkade encryption
+const selectedWithdrawVtxo = ref(null) // For Cashu withdrawal
 const boardingBalance = ref(0)
 const sending = ref(false)
 const receiving = ref(false)
@@ -381,14 +547,15 @@ const estimatedFee = computed(() => {
 
 // Methods
 const handleDecryptToArkade = async () => {
-  if (!confirm('Decrypt all funds back to Arkade wallet?')) return
+  const amount = decryptAmount.value || parseInt(cashuBalance.value)
+  if (!confirm(`Decrypt ${amount} sats back to Arkade wallet?`)) return
   
   decrypting.value = true
   try {
-    const amount = parseInt(cashuBalance.value)
     const result = await decryptArkadeFunds(amount)
     if (result.success) {
       showSuccess(`✅ Successfully decrypted ${result.amount} sats to Arkade!`)
+      decryptAmount.value = null // Clear input
       setTimeout(() => {
         activeTab.value = 'arkade'
       }, 2000)
@@ -398,6 +565,100 @@ const handleDecryptToArkade = async () => {
     showError(`❌ Decryption failed: ${error.message}`)
   } finally {
     decrypting.value = false
+  }
+}
+
+const handleBatchSettle = async () => {
+  if (vtxos.value.length === 0) {
+    showError('No VTXOs to settle')
+    return
+  }
+  
+  // Calculate total amount to settle
+  const totalAmount = vtxos.value.reduce((sum, vtxo) => sum + (vtxo.value || 0), 0)
+  
+  if (!confirm(`Batch settle ${vtxos.value.length} VTXO(s) totaling ${totalAmount} sats back to shadow wallet?\n\nThis will refresh the VTXOs and make them withdrawable to Bitcoin L1.\n\nWait time: 1-3 minutes for ASP round.`)) return
+  
+  settling.value = true
+  try {
+    // Initialize shadow wallet if needed
+    if (!arkadeShadow.isInitialized.value) {
+      await initializeShadowWallet()
+    }
+    
+    showInfo('🔄 Batch settling VTXOs...')
+    showInfo('⏱️ Please wait 1-3 minutes for ASP round to process...')
+    
+    // Get shadow wallet address to settle to
+    const shadowAddress = await arkadeShadow.updateAddress()
+    console.log('Settling to shadow wallet address:', shadowAddress)
+    
+    // Batch settle all VTXOs back to shadow wallet
+    const txid = await arkadeShadow.wallet.value.settle(
+      {
+        inputs: vtxos.value,
+        outputs: [{
+          address: shadowAddress,
+          amount: BigInt(totalAmount)
+        }]
+      },
+      (event) => {
+        console.log('Batch settlement event:', event)
+      }
+    )
+    
+    showSuccess(`✅ Batch settlement initiated! TXID: ${txid.substring(0, 8)}...`)
+    showSuccess('🎉 Wait 1-3 minutes, then reload VTXOs to see fresh settled VTXOs!')
+    
+    // Clear VTXOs list (they'll need to reload after settlement)
+    vtxos.value = []
+    selectedWithdrawVtxo.value = null
+    
+  } catch (error) {
+    console.error('Batch settle error:', error)
+    showError(`❌ Batch settlement failed: ${error.message}`)
+  } finally {
+    settling.value = false
+  }
+}
+
+const handleWithdrawBitcoin = async () => {
+  const vtxo = selectedWithdrawVtxo.value
+  const address = withdrawAddress.value
+  
+  if (!vtxo || !address) {
+    showError('Please select a VTXO and enter Bitcoin address')
+    return
+  }
+  
+  const amount = vtxo.value || 0
+  
+  if (!confirm(`Withdraw ${amount} sats to ${address}?\n\nThis will exit the selected VTXO from shadow wallet to Bitcoin L1.`)) return
+  
+  withdrawing.value = true
+  try {
+    // Initialize shadow wallet if needed
+    if (!arkadeShadow.isInitialized.value) {
+      await initializeShadowWallet()
+    }
+    
+    // Use SHADOW wallet for withdrawal
+    await arkadeShadow.cooperativeExit(address, amount, vtxo)
+    showSuccess(`✅ Successfully initiated withdrawal of ${amount} sats!`)
+    
+    // Clear selection and input
+    selectedWithdrawVtxo.value = null
+    withdrawAmount.value = null
+    withdrawAddress.value = ''
+    
+    // Refresh shadow wallet VTXOs and balances
+    await handleLoadVTXOs()
+    await arkadeShadow.updateBalance()
+  } catch (error) {
+    console.error('Withdraw error:', error)
+    showError(`❌ Withdrawal failed: ${error.message}`)
+  } finally {
+    withdrawing.value = false
   }
 }
 
@@ -901,26 +1162,89 @@ const handleResetArkadeWallet = async () => {
 const handleLoadVTXOs = async () => {
   loading.value = true
   try {
-    // Get balance to check boarding amount
-    const balanceData = await arkade.updateBalance()
-    console.log('Balance data:', balanceData)
+    // Determine which wallet to use based on active tab
+    const isArkadeTab = activeTab.value === 'arkade'
+    const isCashuTab = activeTab.value === 'encrypted'
     
-    // Extract boarding confirmed balance
-    if (balanceData && balanceData.boarding) {
-      if (typeof balanceData.boarding === 'object') {
-        boardingBalance.value = Number(balanceData.boarding.confirmed || 0)
+    let walletToUse
+    let balanceData
+    let allVtxos
+    let targetBalance
+    
+    if (isArkadeTab) {
+      // Load from MAIN Arkade wallet
+      console.log('📍 Loading VTXOs from MAIN Arkade wallet...')
+      walletToUse = arkade
+      
+      // Get balance from MAIN wallet
+      balanceData = await arkade.updateBalance()
+      console.log('Main wallet balance data:', balanceData)
+      
+      // Extract boarding confirmed balance from main wallet
+      if (balanceData && balanceData.boarding) {
+        if (typeof balanceData.boarding === 'object') {
+          boardingBalance.value = Number(balanceData.boarding.confirmed || 0)
+        } else {
+          boardingBalance.value = Number(balanceData.boarding || 0)
+        }
       } else {
-        boardingBalance.value = Number(balanceData.boarding || 0)
+        boardingBalance.value = 0
       }
+      
+      console.log('Main wallet boarding balance:', boardingBalance.value)
+      
+      // Get VTXOs from MAIN wallet
+      allVtxos = await arkade.getVTXOs()
+      console.log('Main wallet VTXOs:', allVtxos)
+      console.log('Main wallet available balance:', arkade.balance.value)
+      targetBalance = arkade.balance.value
+      
+    } else if (isCashuTab) {
+      // Load from SHADOW Arkade wallet (for Cashu withdraw)
+      console.log('🌑 Loading VTXOs from SHADOW Arkade wallet...')
+      
+      // Initialize shadow wallet if needed
+      if (!arkadeShadow.isInitialized.value) {
+        console.log('Initializing shadow Arkade wallet...')
+        await initializeShadowWallet()
+      }
+      
+      walletToUse = arkadeShadow
+      
+      // Get balance from SHADOW wallet
+      balanceData = await arkadeShadow.updateBalance()
+      console.log('Shadow wallet balance data:', balanceData)
+      
+      // Extract boarding confirmed balance from shadow wallet
+      if (balanceData && balanceData.boarding) {
+        if (typeof balanceData.boarding === 'object') {
+          boardingBalance.value = Number(balanceData.boarding.confirmed || 0)
+        } else {
+          boardingBalance.value = Number(balanceData.boarding || 0)
+        }
+      } else {
+        boardingBalance.value = 0
+      }
+      
+      console.log('Shadow wallet boarding balance:', boardingBalance.value)
+      
+      // Get VTXOs from SHADOW wallet
+      allVtxos = await arkadeShadow.getVTXOs()
+      console.log('Shadow wallet VTXOs:', allVtxos)
+      console.log('Shadow wallet available balance:', arkadeShadow.balance.value)
+      targetBalance = arkadeShadow.balance.value
     } else {
+      // Unknown tab, default to shadow for safety
+      console.warn('Unknown tab:', activeTab.value, 'defaulting to shadow wallet')
+      walletToUse = arkadeShadow
+      if (!arkadeShadow.isInitialized.value) {
+        await initializeShadowWallet()
+      }
+      balanceData = await arkadeShadow.updateBalance()
+      allVtxos = await arkadeShadow.getVTXOs()
+      targetBalance = arkadeShadow.balance.value
       boardingBalance.value = 0
     }
-    
-    console.log('Boarding balance:', boardingBalance.value)
-    
-    const allVtxos = await arkade.getVTXOs()
-    console.log('All VTXOs from SDK:', allVtxos)
-    console.log('Available balance:', arkadeBalance.value)
     
     // Filter to only show: settled, pre-confirmed, or confirmed VTXOs
     // AND only show unspent VTXOs (part of current balance)
@@ -1035,8 +1359,8 @@ const handleLoadVTXOs = async () => {
       return dateB - dateA // Newest first
     })
     
-    const targetBalance = arkadeBalance.value
-    console.log('Target balance:', targetBalance)
+    // targetBalance already set above based on active tab
+    console.log('Target balance:', targetBalance, '(from', isArkadeTab ? 'MAIN' : 'SHADOW', 'wallet)')
     console.log('All filtered VTXOs:', sortedVtxos.map(v => ({ value: v.value, createdAt: v.createdAt })))
     
     // Strategy: Take VTXOs greedily but stop if adding the next one would exceed the balance
@@ -1097,6 +1421,21 @@ const selectVtxo = (vtxo) => {
   }
 }
 
+const selectWithdrawVtxo = (vtxo) => {
+  // Toggle selection
+  if (selectedWithdrawVtxo.value === vtxo) {
+    selectedWithdrawVtxo.value = null
+    withdrawAmount.value = null
+    showInfo('VTXO deselected')
+  } else {
+    selectedWithdrawVtxo.value = vtxo
+    // Auto-fill the withdraw amount with the VTXO value
+    const vtxoAmount = vtxo.value || 0
+    withdrawAmount.value = vtxoAmount
+    showSuccess(`✅ Selected ${vtxoAmount} sats VTXO for withdrawal`)
+  }
+}
+
 const handleSendArkade = async ({ address, amount }) => {
   sending.value = true
   try {
@@ -1127,6 +1466,54 @@ const handleSendArkade = async ({ address, amount }) => {
 
 const closeArkadeSendModal = () => {
   closeModal('arkadeSend')
+}
+
+const handleSendFromShadow = async ({ address, amount }) => {
+  sending.value = true
+  try {
+    if (!address || !amount) {
+      showError('⚠️ Please enter address and amount')
+      return
+    }
+    
+    // Initialize shadow wallet if needed
+    if (!arkadeShadow.isInitialized.value) {
+      await initializeShadowWallet()
+    }
+    
+    const shadowBalance = arkadeShadow.balance.value
+    const shadowBalanceNum = typeof shadowBalance === 'bigint' ? Number(shadowBalance) : parseInt(shadowBalance || '0')
+    
+    if (shadowBalanceNum < amount) {
+      showError(`⚠️ Insufficient balance in shadow wallet. Have ${shadowBalanceNum} sats, need ${amount} sats`)
+      return
+    }
+    
+    showInfo('📤 Sending from shadow wallet to Ark address...')
+    
+    // Use shadow wallet's sendPayment method
+    const result = await arkadeShadow.wallet.value.sendBitcoin({
+      address: address,
+      amount: amount
+    })
+    
+    showSuccess(`✅ Sent ${amount} sats from shadow wallet! TxID: ${result?.substring(0, 12)}...`)
+    
+    // Update shadow wallet balance
+    await arkadeShadow.updateBalance()
+    
+    closeShadowSendModal()
+    
+  } catch (error) {
+    console.error('Failed to send from shadow wallet:', error)
+    showError(`❌ Send failed: ${error.message}`)
+  } finally {
+    sending.value = false
+  }
+}
+
+const closeShadowSendModal = () => {
+  closeModal('shadowSend')
 }
 
 // Helper functions for VTXO status
@@ -1195,12 +1582,21 @@ onMounted(async () => {
     await cashu.initialize()
     console.log('Cashu wallet initialized')
     
-    // Initialize Arkade wallet
+    // Initialize shadow Arkade wallet FIRST (for Cashu operations)
+    try {
+      await initializeShadowWallet()
+      console.log('Shadow Arkade wallet initialized')
+    } catch (error) {
+      console.error('Failed to initialize shadow Arkade wallet:', error)
+      // Don't fail the entire mount, just log it
+    }
+    
+    // Initialize main Arkade wallet AFTER shadow (ensures main wallet key is restored)
     try {
       await arkade.initialize()
-      console.log('Arkade wallet initialized')
+      console.log('Main Arkade wallet initialized')
     } catch (error) {
-      console.error('Failed to initialize Arkade wallet:', error)
+      console.error('Failed to initialize main Arkade wallet:', error)
       // Don't fail the entire mount, just log it
     }
   } catch (error) {
@@ -1215,1765 +1611,4 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
-.unified-wallet {
-  min-height: 100vh;
-  padding: 1rem 4rem;
-  transition: background 0.5s ease;
-  border-radius: 0;
-  background: #0B0D11;
-}
-
-/* Tabs Wrapper - Align with layout */
-.tabs-wrapper {
-  width: 100%;
-  max-width: calc(550px + 8rem + 550px);
-  margin: 0 auto;
-  margin-bottom: 2rem;
-}
-
-/* Cashu Layout - Align with tabs */
-.cashu-layout {
-  width: 550px;
-  margin: 0 auto;
-  margin-left: calc(50% - (550px + 8rem + 550px) / 2);
-}
-
-/* Wallet Views */
-.wallet-view {
-  max-width: 800px;
-  color: white;
-}
-
-/* Balance Display */
-.balance-display {
-  text-align: left;
-  margin-bottom: 2.5rem;
-  padding: 0;
-}
-
-.unprotected .balance-display {
-  margin-bottom: 0.5rem;
-}
-
-.balance-label {
-  font-size: 0.9rem;
-  letter-spacing: 2px;
-  opacity: 0.7;
-  margin-bottom: 1rem;
-  color: #00F2E1;
-  text-transform: uppercase;
-}
-
-.balance-amount {
-  font-size: 3.5rem;
-  font-weight: 800;
-  line-height: 1;
-  background: linear-gradient(135deg, #4fc3f7 0%, #66ffc1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.encrypted-mode .unprotected .balance-amount {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.unit {
-  font-size: 1.5rem;
-  opacity: 0.6;
-  margin-left: 0.5rem;
-  color: white;
-  -webkit-text-fill-color: rgba(255, 255, 255, 0.6);
-}
-
-/* Time at Rest */
-.time-at-rest {
-  background: rgba(79, 195, 247, 0.1);
-  border: 1px solid rgba(79, 195, 247, 0.3);
-  border-radius: 16px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.time-label {
-  font-size: 0.85rem;
-  opacity: 0.7;
-  margin-bottom: 1rem;
-}
-
-.days-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.days-badge {
-  background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
-  color: #0a1628;
-  padding: 0.5rem 1.5rem;
-  border-radius: 20px;
-  font-weight: 800;
-  font-size: 1.1rem;
-}
-
-.target-text {
-  font-size: 0.85rem;
-  opacity: 0.6;
-}
-
-.progress-bar-container {
-  background: rgba(255, 255, 255, 0.1);
-  height: 8px;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  background: linear-gradient(90deg, #a8ff78 0%, #78ffd6 100%);
-  height: 100%;
-  border-radius: 10px;
-  transition: width 0.5s ease;
-}
-
-/* New Time at Rest */
-.time-at-rest-new {
-  margin-bottom: 2rem;
-}
-
-.time-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.6;
-}
-
-.time-label-new {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.time-target {
-  color: #616877;
-  font-size: 0.875rem;
-}
-
-.time-progress-card {
-  background: rgba(45, 49, 60, 0.4);
-  border-radius: 14px;
-  height: 72px;
-  overflow: hidden;
-  box-shadow: inset 0px 2px 0px 0px rgba(255, 255, 255, 0.06);
-}
-
-.time-progress-fill {
-  background: linear-gradient(135deg, #00F2E1 0%, #FFD900 100%);
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: width 0.5s ease;
-  min-width: 144px;
-  border-radius: 14px 0 0 14px;
-}
-
-.days-text {
-  color: #161920;
-  font-size: 1.375rem;
-  font-weight: 500;
-  letter-spacing: 0.44px;
-  line-height: 1.6;
-}
-
-/* Action Buttons */
-.action-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.action-btn {
-  padding: 1.25rem;
-  border: none;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
-  color: #0a1628;
-}
-
-.action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(168, 255, 120, 0.4);
-}
-
-/* New Action Buttons */
-.action-buttons-new {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
-  margin-bottom: 2rem;
-}
-
-.action-btn-gradient {
-  height: 161px;
-  border: none;
-  border-radius: 14px;
-  font-size: 1.375rem;
-  font-weight: 700;
-  letter-spacing: -0.6592px;
-  line-height: 0.9;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, #00F2E1 0%, #FFD900 100%);
-  color: #161920;
-  box-shadow: inset 0px 2px 0px 0px rgba(255, 255, 255, 0.06);
-}
-
-.action-btn-gradient:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(255, 217, 0, 0.4), inset 0px 2px 0px 0px rgba(255, 255, 255, 0.06);
-}
-
-.info-text-encrypted {
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  color: #586b79;
-  text-align: center;
-  opacity: 0.8;
-  margin-bottom: 2rem;
-}
-
-/* Encrypt Section */
-.encrypt-section {
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid rgba(255, 107, 107, 0.3);
-  border-radius: 16px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.encrypt-section h3 {
-  margin-bottom: 0.5rem;
-  font-size: 1.3rem;
-}
-
-.encrypt-subtitle {
-  opacity: 0.7;
-  font-size: 0.9rem;
-  margin-bottom: 1.5rem;
-}
-
-.input-with-btn {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.encrypt-input {
-  flex: 1;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  color: white;
-  font-size: 1rem;
-}
-
-.encrypt-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.percentage-btn {
-  padding: 1rem 1.5rem;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  color: white;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.percentage-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.conversion-display {
-  text-align: center;
-  margin: 1.5rem 0;
-}
-
-.conversion-arrow {
-  font-size: 2rem;
-  opacity: 0.5;
-  margin-bottom: 0.5rem;
-}
-
-.you-receive {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  background: rgba(79, 195, 247, 0.2);
-  border-radius: 8px;
-}
-
-.you-receive .label {
-  opacity: 0.7;
-  font-size: 0.9rem;
-}
-
-.you-receive .amount {
-  font-weight: 700;
-  font-size: 1.2rem;
-}
-
-.unit-small {
-  font-size: 0.9rem;
-  opacity: 0.6;
-}
-
-.route-info {
-  background: rgba(0, 0, 0, 0.2);
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 1.5rem;
-}
-
-.route-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
-.route-header .label {
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-
-.route-header .fee {
-  background: rgba(168, 255, 120, 0.2);
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #a8ff78;
-}
-
-.route-name {
-  font-family: monospace;
-  font-size: 0.85rem;
-  opacity: 0.8;
-  word-break: break-all;
-}
-
-.encrypt-btn {
-  width: 100%;
-  padding: 1.25rem;
-  border: none;
-  border-radius: 12px;
-  font-size: 1.1rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
-  color: #0a1628;
-  margin-bottom: 1rem;
-}
-
-.encrypt-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(168, 255, 120, 0.4);
-}
-
-.encrypt-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.warning-text {
-  font-size: 0.85rem;
-  opacity: 0.8;
-  line-height: 1.5;
-  color: #ff8e53;
-}
-
-.info-text {
-  font-size: 0.9rem;
-  opacity: 0.8;
-  line-height: 1.6;
-  text-align: center;
-  padding: 1rem;
-  background: rgba(79, 195, 247, 0.1);
-  border-radius: 8px;
-  margin-bottom: 2rem;
-}
-
-/* New Figma-style components */
-.encrypted-balance {
-  margin-bottom: 17.5rem;
-}
-
-.encrypted-balance .balance-label {
-  font-size: 1.875rem;
-  font-weight: 900;
-  letter-spacing: 0.01em;
-  line-height: 1.4;
-  text-transform: uppercase;
-  color: #00F2E1 !important;
-  opacity: 1 !important;
-  margin-bottom: 0.5rem;
-}
-
-.unprotected-balance .balance-label {
-  font-size: 1.875rem;
-  font-weight: 900;
-  letter-spacing: 0.01em;
-  line-height: 1.4;
-  text-transform: uppercase;
-  color: #00F2E1 !important;
-  opacity: 1 !important;
-  margin-bottom: 0.5rem;
-}
-
-.balance-amount-large {
-  font-size: 9rem;
-  font-weight: 900;
-  line-height: 1.4;
-  letter-spacing: 1.25px;
-  text-transform: uppercase;
-  background: linear-gradient(180deg, #ff4b2b 0%, #00f2e1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.unit-btc {
-  font-size: 1.875rem;
-  letter-spacing: 0.3px;
-  margin-left: -0.5rem;
-  background: linear-gradient(180deg, #ff4b2b 0%, #00f2e1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Encrypted gradient override */
-.encrypted-balance .balance-amount-large.encrypted-gradient {
-  background: linear-gradient(180deg, #FFD900 0%, #00F2E1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.encrypted-balance .unit-btc.encrypted-gradient {
-  background: linear-gradient(180deg, #FFD900 0%, #00F2E1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.encrypt-section-new {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  margin-bottom: 2.625rem;
-}
-
-.card-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.card-header-external {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.card-label-external {
-  font-family: 'Satoshi', sans-serif;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #FFFFFF;
-  opacity: 0.8;
-}
-
-.card-balance-external {
-  font-family: 'Satoshi', sans-serif;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #616877;
-  opacity: 0.8;
-}
-
-.input-card {
-  background: rgba(45, 49, 60, 0.4);
-  border-radius: 14px;
-  padding: 1.5rem 1.75rem;
-  box-shadow: inset 0px 2px 0px rgba(255, 255, 255, 0.06);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.6;
-}
-
-.card-label {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.card-balance {
-  color: #616877;
-  font-size: 0.875rem;
-}
-
-.card-input-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.currency-selector {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-
-.currency-text {
-  color: white;
-  font-size: 1.125rem;
-  font-weight: 500;
-  line-height: 1.6;
-}
-
-.dropdown-icon {
-  color: white;
-  font-size: 0.75rem;
-  opacity: 0.6;
-}
-
-.info-icon {
-  font-size: 1rem;
-  margin-left: 0.75rem;
-  opacity: 0.6;
-}
-
-.percentage-btn-new {
-  padding: 0.5rem 1.25rem;
-  background: transparent;
-  border: none;
-  color: white;
-  font-size: 1.375rem;
-  font-weight: 500;
-  letter-spacing: 0.44px;
-  cursor: pointer;
-  line-height: 1.6;
-  transition: all 0.2s;
-}
-
-.percentage-btn-new:hover:not(:disabled) {
-  opacity: 0.8;
-}
-
-.percentage-btn-new:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.input-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.amount-input {
-  background: transparent;
-  border: none;
-  color: white;
-  font-size: 1.375rem;
-  font-weight: 500;
-  letter-spacing: 0.44px;
-  line-height: 1.6;
-  text-align: right;
-  width: 120px;
-  outline: none;
-}
-
-.amount-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.amount-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Remove number input arrows */
-.amount-input::-webkit-outer-spin-button,
-.amount-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.amount-input[type=number] {
-  -moz-appearance: textfield;
-}
-
-.max-btn {
-  padding: 0.25rem 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.max-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.max-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.output-amount {
-  color: white;
-  font-size: 1.75rem;
-  font-weight: 500;
-  letter-spacing: 0.44px;
-  line-height: 1.6;
-}
-
-.swap-icon-container {
-  position: absolute;
-  left: 50%;
-  top: 57%;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.swap-icon-background {
-  position: absolute;
-  width: 7rem;
-  height: 7rem;
-  background: #0B0D11;
-  border-radius: 50%;
-  z-index: 1;
-}
-
-.swap-icon {
-  position: relative;
-  width: 5rem;
-  height: 5rem;
-  background: linear-gradient(135deg, #00F2E1 0%, #FFD900 100%);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #1b1e26;
-  box-shadow: 0 4px 12px rgba(255, 217, 0, 0.3);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  z-index: 2;
-}
-
-.swap-icon:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(255, 217, 0, 0.5);
-}
-
-.route-section-new {
-  margin-bottom: 2.625rem;
-}
-
-.route-label {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.6;
-  margin-bottom: 0.5rem;
-}
-
-.route-selector {
-  background: rgba(45, 49, 60, 0.4);
-  border-radius: 14px;
-  padding: 1.6875rem 1.75rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: inset 0px 2px 0px 0px rgba(255, 255, 255, 0.06);
-}
-
-.route-name-new {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: white;
-  font-size: 1.125rem;
-  font-weight: 500;
-  line-height: 1.6;
-}
-
-.route-fee {
-  color: white;
-  font-size: 1.375rem;
-  font-weight: 500;
-  letter-spacing: 0.44px;
-  line-height: 1.6;
-}
-
-.encrypt-btn-new {
-  width: 100%;
-  padding: 1.375rem 2.5rem;
-  border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #00F2E1 0%, #FFD900 100%);
-  color: #161920;
-  font-size: 1.1875rem;
-  font-weight: 700;
-  letter-spacing: 1.9px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-bottom: 1.5rem;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 72px;
-}
-
-.encrypt-btn-new:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(255, 217, 0, 0.4);
-}
-
-.encrypt-btn-new:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.warning-text-new {
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  color: #586b79;
-  text-align: center;
-  opacity: 0.8;
-  margin-bottom: 2rem;
-}
-
-.secondary-btn {
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.secondary-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.secondary-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.secondary-btn.danger {
-  background: rgba(255, 69, 58, 0.2);
-  border-color: rgba(255, 69, 58, 0.4);
-}
-
-.secondary-btn.danger:hover:not(:disabled) {
-  background: rgba(255, 69, 58, 0.3);
-  border-color: rgba(255, 69, 58, 0.6);
-}
-
-
-/* Modals */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.modal-content {
-  background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
-  padding: 2.5rem;
-  border-radius: 16px;
-  max-width: 600px;
-  width: 100%;
-  max-height: 85vh;
-  overflow-y: auto;
-  border: 1px solid rgba(79, 195, 247, 0.3);
-}
-
-.modal-content h3 {
-  margin-bottom: 1rem;
-  color: white;
-}
-
-.modal-info {
-  opacity: 0.7;
-  font-size: 0.9rem;
-  margin-bottom: 1.5rem;
-  color: white;
-}
-
-.balance-info {
-  background: rgba(79, 195, 247, 0.1);
-  padding: 0.75rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  text-align: center;
-  color: #4fc3f7;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.modal-input {
-  width: 100%;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  color: white;
-  font-size: 1rem;
-}
-
-.modal-input.textarea {
-  min-height: 100px;
-  font-family: monospace;
-  resize: vertical;
-}
-
-.modal-btn {
-  width: 100%;
-  padding: 1rem;
-  border: none;
-  border-radius: 8px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 0.75rem;
-}
-
-.modal-btn.primary {
-  background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
-  color: #0a1628;
-}
-
-.modal-btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.modal-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.modal-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.receive-mode-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding-bottom: 0.5rem;
-}
-
-.mode-tab-btn {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  border: none;
-  border-radius: 8px 8px 0 0;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-bottom: 2px solid transparent;
-}
-
-.mode-tab-btn.active {
-  background: rgba(255, 255, 255, 0.2);
-  border-bottom: 2px solid #4fc3f7;
-  color: #4fc3f7;
-}
-
-.mode-tab-btn:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.receive-mode-content {
-  margin-top: 1rem;
-}
-
-.invoice-display {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.qr-container-modal {
-  display: flex;
-  justify-content: center;
-  padding: 1rem;
-  background: white;
-  border-radius: 12px;
-  margin: 1rem 0;
-}
-
-.qr-container-modal canvas {
-  display: block;
-  border-radius: 8px;
-}
-
-.invoice-text {
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.success-text {
-  color: #66bb6a;
-  margin-bottom: 1rem;
-  font-weight: 600;
-}
-
-.info-text {
-  color: #4fc3f7;
-  margin-top: 1rem;
-  font-size: 0.9rem;
-  opacity: 0.9;
-}
-
-.deposit-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.deposit-options .info-note {
-  font-size: 0.85rem;
-  opacity: 0.8;
-  color: #4fc3f7;
-  text-align: center;
-  margin-top: 0.5rem;
-}
-
-.warning-box {
-  background: rgba(255, 193, 7, 0.2);
-  border: 1px solid rgba(255, 193, 7, 0.5);
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  color: #ffc107;
-  font-size: 0.9rem;
-}
-
-.warning-box p {
-  margin-bottom: 0.5rem;
-}
-
-.warning-box .error-detail {
-  font-size: 0.85rem;
-  opacity: 0.9;
-  font-family: monospace;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 0.5rem;
-  border-radius: 4px;
-  margin: 0.5rem 0;
-}
-
-.warning-box .info-note {
-  font-size: 0.85rem;
-  opacity: 0.8;
-  margin-top: 0.5rem;
-}
-
-.warning-box .reset-btn {
-  margin-top: 0.75rem;
-  padding: 0.75rem 1.5rem;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.warning-box .reset-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
-}
-
-.lightning-deposit {
-  background: rgba(79, 195, 247, 0.1);
-  padding: 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 1.5rem;
-}
-
-.lightning-deposit h4 {
-  margin-bottom: 1rem;
-  color: white;
-}
-
-.address-display {
-  background: rgba(79, 195, 247, 0.1);
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-}
-
-.address-display .label {
-  font-size: 0.85rem;
-  opacity: 0.7;
-  margin-bottom: 0.5rem;
-  color: white;
-}
-
-.address-box {
-  font-family: monospace;
-  font-size: 0.85rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
-  word-break: break-all;
-  cursor: pointer;
-  margin-bottom: 0.75rem;
-  color: white;
-}
-
-.mnemonic-box {
-  font-family: monospace;
-  font-size: 0.9rem;
-  padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  word-break: break-all;
-  color: white;
-  margin: 1rem 0;
-  line-height: 1.6;
-}
-
-.warning-text {
-  color: #ffd900;
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
-  opacity: 0.9;
-}
-
-.token-output {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.token-output .success {
-  color: #a8ff78;
-  margin-bottom: 0.5rem;
-}
-
-.token-text {
-  width: 100%;
-  min-height: 80px;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  color: white;
-  font-family: monospace;
-  font-size: 0.85rem;
-  resize: vertical;
-  margin-bottom: 0.75rem;
-  cursor: pointer;
-}
-
-/* VTXOs */
-.vtxos-list {
-  margin-top: 1.5rem;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.vtxo-item {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.vtxo-detail {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.25rem 0;
-  color: white;
-}
-
-.vtxo-detail .label {
-  font-weight: 600;
-  color: #a8ff78;
-}
-
-.vtxo-detail .value {
-  color: white;
-  font-family: monospace;
-}
-
-.vtxo-detail .value.small {
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-.info-text {
-  color: #4fc3f7;
-  font-size: 0.9rem;
-  margin: 0.5rem 0;
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .unified-wallet {
-    padding: 2.5rem 3rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .unified-wallet {
-    padding: 2rem 2rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .unified-wallet {
-    padding: 1.5rem;
-    border-radius: 0;
-  }
-
-  .balance-amount {
-    font-size: 2.5rem;
-  }
-
-  .balance-amount-large {
-    font-size: 4rem;
-  }
-
-  .unit-btc {
-    font-size: 1.2rem;
-  }
-
-  .action-buttons {
-    grid-template-columns: 1fr;
-  }
-
-  .action-buttons-new {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .action-btn-gradient {
-    height: 120px;
-    font-size: 1.2rem;
-  }
-
-  .swap-icon-background {
-    width: 7rem;
-    height: 7rem;
-  }
-
-  .swap-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
-
-  .status-indicator {
-    width: 2rem;
-    height: 2rem;
-  }
-
-  .time-progress-fill {
-    min-width: 100px;
-  }
-
-  .days-text {
-    font-size: 1.1rem;
-  }
-
-  .amount-input {
-    font-size: 1.1rem;
-    width: 80px;
-  }
-
-  .max-btn {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.5rem;
-  }
-}
-
-.qr-code-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.qr-code-image {
-  width: 100px;
-  height: 100px;
-  margin-bottom: 0.5rem;
-}
-
-.qr-hint {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
-  text-align: center;
-}
-
-/* Arkade Layout with Right Panel */
-.arkade-layout {
-  display: grid;
-  grid-template-columns: 550px 550px;
-  gap: 8rem;
-  align-items: start;
-  margin: 0 auto;
-  max-width: fit-content;
-}
-
-/* Right Panel */
-.right-panel {
-  background: #171A21;
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  display: flex;
-  flex-direction: column;
-  min-height: 700px;
-}
-
-.panel-header {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 0.75rem;
-}
-
-.panel-tab {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: none;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.panel-tab:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.panel-tab.active {
-  background: linear-gradient(135deg, #00F2E1 0%, #FFD900 100%);
-  color: #161920;
-  font-weight: 700;
-}
-
-.panel-content {
-  color: white;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  flex: 1;
-}
-
-.panel-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: white;
-  margin: 0;
-}
-
-.panel-description {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin: 0 0 0.5rem 0;
-}
-
-.vtxo-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.panel-action-btn {
-  padding: 1rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  color: white;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-align: center;
-}
-
-.panel-action-btn.secondary {
-  background: rgba(0, 0, 0, 0.3);
-  border: none;
-}
-
-.panel-action-btn.secondary:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.4);
-  transform: translateY(-1px);
-}
-
-.panel-action-btn.primary {
-  background: rgba(0, 0, 0, 0.3);
-  border: none;
-  letter-spacing: 0.5px;
-  font-weight: 700;
-}
-
-.panel-action-btn.primary:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.4);
-  transform: translateY(-1px);
-}
-
-.panel-action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.boarding-balance-card {
-  background: rgba(0, 0, 0, 0.3);
-  border: none;
-  border-radius: 8px;
-  padding: 1.25rem;
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
-.boarding-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.boarding-icon {
-  font-size: 1.5rem;
-}
-
-.boarding-label {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.boarding-amount {
-  font-size: 2.5rem;
-  font-weight: 900;
-  color: white;
-  line-height: 1.2;
-  margin-bottom: 0.5rem;
-}
-
-.boarding-unit {
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 600;
-}
-
-.boarding-description {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.onboard-info {
-  background: rgba(0, 0, 0, 0.3);
-  border: none;
-  border-radius: 8px;
-  padding: 0.875rem;
-  margin-bottom: 1rem;
-}
-
-.onboard-info.info {
-  background: rgba(0, 0, 0, 0.3);
-  border: none;
-}
-
-.onboard-info p {
-  margin: 0;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
-  line-height: 1.5;
-}
-
-.deposit-options-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.address-display-panel {
-  margin-top: 1rem;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 10px;
-}
-
-.address-type {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #00F2E1;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 0.5rem;
-}
-
-.address-box-panel {
-  font-family: monospace;
-  font-size: 0.8rem;
-  padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 6px;
-  word-break: break-all;
-  cursor: pointer;
-  margin-bottom: 0.75rem;
-  color: white;
-  transition: background 0.2s ease;
-  width: 100%;
-}
-
-.address-box-panel:hover {
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.copy-btn-panel {
-  width: 100%;
-  padding: 0.625rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 0.875rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.copy-btn-panel:hover {
-  background: rgba(0, 0, 0, 0.4);
-  transform: translateY(-1px);
-}
-
-.vtxos-list-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-height: 400px;
-  overflow-y: auto;
-  margin-top: 0.5rem;
-}
-
-.vtxo-item-panel {
-  background: rgba(0, 0, 0, 0.2);
-  padding: 0.875rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.vtxo-item-panel:hover {
-  background: rgba(0, 0, 0, 0.3);
-  border-color: rgba(0, 242, 225, 0.2);
-  transform: translateY(-1px);
-}
-
-.vtxo-item-panel.selected {
-  background: rgba(0, 242, 225, 0.1);
-  border-color: rgba(0, 242, 225, 0.5);
-  border-width: 2px;
-  box-shadow: 0 0 20px rgba(0, 242, 225, 0.2);
-}
-
-.vtxo-selected-indicator {
-  margin-top: 0.75rem;
-  padding: 0.5rem;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 6px;
-  text-align: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: white;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.vtxo-header-panel {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.vtxo-status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.vtxo-status-badge.status-settled {
-  background: rgba(102, 187, 106, 0.2);
-  color: #66bb6a;
-  border: 1px solid rgba(102, 187, 106, 0.3);
-}
-
-.vtxo-status-badge.status-preconfirmed {
-  background: rgba(255, 217, 0, 0.2);
-  color: #FFD900;
-  border: 1px solid rgba(255, 217, 0, 0.3);
-}
-
-.vtxo-status-badge.status-confirmed {
-  background: rgba(0, 242, 225, 0.2);
-  color: #00F2E1;
-  border: 1px solid rgba(0, 242, 225, 0.3);
-}
-
-.vtxo-status-badge.status-default {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.vtxo-amount-badge {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: white;
-  font-family: monospace;
-}
-
-.vtxo-detail-panel {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.25rem 0;
-  color: white;
-  font-size: 0.8rem;
-}
-
-.vtxo-label {
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.vtxo-value {
-  color: rgba(255, 255, 255, 0.9);
-  font-family: monospace;
-}
-
-.vtxo-value.small {
-  font-size: 0.7rem;
-  opacity: 0.8;
-}
-
-.encryption-preview {
-  background: linear-gradient(135deg, rgba(0, 242, 225, 0.1) 0%, rgba(255, 217, 0, 0.1) 100%);
-  border: 1px solid rgba(0, 242, 225, 0.3);
-  border-radius: 12px;
-  padding: 1.25rem;
-  margin-top: 1rem;
-}
-
-.preview-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.875rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.preview-icon {
-  font-size: 1.25rem;
-}
-
-.preview-title {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #00F2E1;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.preview-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  font-size: 0.875rem;
-}
-
-.preview-row.total {
-  margin-top: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.preview-label {
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 600;
-}
-
-.preview-value {
-  color: white;
-  font-weight: 700;
-  font-family: monospace;
-}
-
-.preview-value.fee {
-  color: #FF8E53;
-}
-
-.preview-row.total .preview-label {
-  color: white;
-  font-weight: 700;
-}
-
-.preview-row.total .preview-value {
-  color: #00F2E1;
-  font-size: 1.25rem;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 2rem 1rem;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.875rem;
-}
-
-.empty-state p {
-  margin: 0;
-}
-
-.loading-state {
-  text-align: center;
-  padding: 2rem 1rem;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.95rem;
-}
-
-.loading-state p {
-  margin: 0;
-}
-
-.qr-code-panel {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 1.5rem;
-  background: white;
-  border-radius: 10px;
-  margin: 1rem 0;
-  width: 100%;
-}
-
-.qr-code-panel canvas {
-  display: block;
-  border-radius: 6px;
-}
-
-/* Responsive */
-@media (max-width: 1200px) {
-  .arkade-layout {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-  }
-
-  .right-panel {
-    width: 100%;
-    max-width: 800px;
-  }
-}
-</style>
-
+<style scoped src="../styles/components/unified-wallet.css"></style>

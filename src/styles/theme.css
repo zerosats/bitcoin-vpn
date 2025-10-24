@@ -1,0 +1,76 @@
+/* Design Tokens & Theme Variables */
+
+:root {
+  /* Colors */
+  --color-background: #0B0D11;
+  --color-surface: #171A21;
+  --color-surface-elevated: rgba(45, 49, 60, 0.4);
+  
+  /* Brand Colors */
+  --color-primary: #00F2E1;
+  --color-secondary: #FFD900;
+  --color-accent: #ff4b2b;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #00F2E1 0%, #FFD900 100%);
+  --gradient-encrypted: linear-gradient(180deg, #FFD900 0%, #00F2E1 100%);
+  --gradient-arkade: linear-gradient(180deg, #ff4b2b 0%, #00f2e1 100%);
+  --gradient-green: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
+  --gradient-blue: linear-gradient(135deg, #4fc3f7 0%, #66ffc1 100%);
+  
+  /* Text Colors */
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.8);
+  --text-tertiary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-disabled: rgba(255, 255, 255, 0.3);
+  
+  /* Status Colors */
+  --status-success: #66bb6a;
+  --status-warning: #ffc107;
+  --status-error: #ff4b2b;
+  --status-info: #4fc3f7;
+  
+  /* Borders */
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-color-hover: rgba(255, 255, 255, 0.2);
+  --border-color-focus: rgba(0, 242, 225, 0.5);
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 2.5rem;
+  
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  
+  /* Shadows */
+  --shadow-inset: inset 0px 2px 0px 0px rgba(255, 255, 255, 0.06);
+  --shadow-hover: 0 8px 25px rgba(255, 217, 0, 0.4);
+  --shadow-elevated: 0 4px 12px rgba(255, 217, 0, 0.3);
+  
+  /* Typography */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.375rem;
+  --font-size-2xl: 1.875rem;
+  --font-size-3xl: 3.5rem;
+  --font-size-4xl: 4.5rem;
+  --font-size-5xl: 9rem;
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+}
+
