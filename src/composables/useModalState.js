@@ -6,6 +6,7 @@ export function useModalState() {
     receive: false,
     arkadeDeposit: false,
     arkadeSend: false,
+    shadowSend: false,
     arkadePrivateKey: false,
     vtxos: false
   })

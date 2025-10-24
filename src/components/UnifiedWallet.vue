@@ -19,6 +19,9 @@
               <button @click="() => { handleDecryptToArkade(); showMenu = false }" class="menu-item" :disabled="!cashuBalance || decrypting">
                 {{ decrypting ? '🔓 Decrypting...' : '🔓 Decrypt to Arkade' }}
               </button>
+              <button @click="openModal('shadowSend'); showMenu = false" class="menu-item">
+                📤 Send from Shadow Wallet
+              </button>
             </template>
             <!-- Arkade Advanced Options -->
             <template v-else-if="activeTab === 'arkade'">
@@ -399,6 +402,15 @@
       :balance="arkadeBalance"
       @close="closeArkadeSendModal"
       @send="handleSendArkade"
+    />
+
+    <!-- Shadow Wallet Send Modal -->
+    <ArkadeSendModal 
+      :show="modals.shadowSend"
+      :sending="sending"
+      :balance="arkadeShadow.balance.value ? arkadeShadow.balance.value.toString() : '0'"
+      @close="closeShadowSendModal"
+      @send="handleSendFromShadow"
     />
 
     <!-- Messages -->
@@ -1454,6 +1466,54 @@ const handleSendArkade = async ({ address, amount }) => {
 
 const closeArkadeSendModal = () => {
   closeModal('arkadeSend')
+}
+
+const handleSendFromShadow = async ({ address, amount }) => {
+  sending.value = true
+  try {
+    if (!address || !amount) {
+      showError('⚠️ Please enter address and amount')
+      return
+    }
+    
+    // Initialize shadow wallet if needed
+    if (!arkadeShadow.isInitialized.value) {
+      await initializeShadowWallet()
+    }
+    
+    const shadowBalance = arkadeShadow.balance.value
+    const shadowBalanceNum = typeof shadowBalance === 'bigint' ? Number(shadowBalance) : parseInt(shadowBalance || '0')
+    
+    if (shadowBalanceNum < amount) {
+      showError(`⚠️ Insufficient balance in shadow wallet. Have ${shadowBalanceNum} sats, need ${amount} sats`)
+      return
+    }
+    
+    showInfo('📤 Sending from shadow wallet to Ark address...')
+    
+    // Use shadow wallet's sendPayment method
+    const result = await arkadeShadow.wallet.value.sendBitcoin({
+      address: address,
+      amount: amount
+    })
+    
+    showSuccess(`✅ Sent ${amount} sats from shadow wallet! TxID: ${result?.substring(0, 12)}...`)
+    
+    // Update shadow wallet balance
+    await arkadeShadow.updateBalance()
+    
+    closeShadowSendModal()
+    
+  } catch (error) {
+    console.error('Failed to send from shadow wallet:', error)
+    showError(`❌ Send failed: ${error.message}`)
+  } finally {
+    sending.value = false
+  }
+}
+
+const closeShadowSendModal = () => {
+  closeModal('shadowSend')
 }
 
 // Helper functions for VTXO status
